@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Smart Regional BeverageDispatch System - Streamline your beverage delivery with smart dispatch and intelligent inventory management.">
+    <title>Smart Flow Dispatch System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="logo">SmartFlow</div>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="#about">About</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+            <div class="auth-links">
+                <a href="/login">Login</a>
+                <a href="/register" class="register-btn">Register</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Smart Regional Dispatch System</h1>
+                <p>Streamline your beverage delivery with our smart dispatch system. With intelligent tools for staff, customers, and admin, we simplify your logistics process.</p>
+                <a href="#features" class="cta-btn">Explore Features</a>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="about" id="about">
+            <div class="section-header">
+                <h2>About Us</h2>
+            </div>
+            <div class="section-content">
+                <p>SmartFlow is a technology-driven logistics system that transforms delivery operations into a seamless, efficient experience. Our platform connects beverage dealers with advanced tools for order dispatch, staff coordination, and inventory management — all from a centralized system with real-time updates.</p>
+                <p>Built on scalable cloud-based infrastructure, SmartFlow offers insightful analytics, a user-friendly interface, and real-time tracking for customers and staff.</p>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" id="features">
+            <div class="section-header">
+                <h2>Features</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-item"><i class="fas fa-users"></i><h3>Login Access</h3><p>Secure login for staff, customers, and admin.</p></div>
+                <div class="feature-item"><i class="fas fa-cogs"></i><h3>Admin Control</h3><p>Assign deliveries and manage regions efficiently.</p></div>
+                <div class="feature-item"><i class="fas fa-chart-line"></i><h3>Real-Time Tracking</h3><p>Track delivery statuses instantly with live updates.</p></div>
+                <div class="feature-item"><i class="fas fa-chart-pie"></i><h3>Analytics</h3><p>AI-based forecasting and trend dashboards.</p></div>
+                <div class="feature-item"><i class="fas fa-truck"></i><h3>Staff Tools</h3><p>Staff can update delivery statuses in real time.</p></div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section class="contact" id="contact">
+            <div class="section-header">
+                <h2>Contact Us</h2>
+            </div>
+            <div class="contact-content">
+                <p>Have questions or need support? Reach out to us!</p>
+                <p><i class="fas fa-envelope"></i> Email: support@smartflow.com</p>
+                <p><i class="fas fa-phone"></i> Phone: +91-98765-43210</p>
+                <p><i class="fas fa-map-marker-alt"></i> Address: SmartFlow HQ, Chennai, Tamil Nadu, India</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 SmartFlow Dispatch System. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Smooth scrolling for links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+            behavior: 'smooth'
+        });
+    });
+});
+    </script>
+</body>
+</html>

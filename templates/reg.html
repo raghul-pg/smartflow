@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register | Smart Dispatch</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reg.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🚚 Smart Flow Dispatch - Register</h1>
+
+        <!-- Step 1: Role selection -->
+        <div id="roleSelection" class="role-selection">
+            <div class="role-card" onclick="showForm('customer')">
+                <h2>🛒 Customer</h2>
+                <p>Sign up to book deliveries and track orders.</p>
+            </div>
+            <div class="role-card" onclick="showForm('staff')">
+                <h2>👷 Staff</h2>
+                <p>Join the team to manage and deliver packages.</p>
+            </div>
+        </div>
+
+        <!-- Step 2: Customer form -->
+        <div id="customerRegister" class="hidden form-section">
+            <h2>Customer Registration</h2>
+            <form id="customerForm">
+                <input type="text" id="customer_name" placeholder="Full Name" required>
+                <input type="email" id="customer_email" placeholder="Email" required>
+                <input type="text" id="customer_phone" placeholder="Phone" required>
+                <input type="text" id="customer_city" placeholder="City" required>
+                <input type="text" id="customer_state" placeholder="State" required>
+                <input type="text" id="customer_zipcode" placeholder="ZIP Code" required>
+                <input type="text" id="customer_country" placeholder="Country" required>
+                <textarea id="customer_address" placeholder="Address" required></textarea>
+                <button type="submit">Register</button>
+                <button type="button" class="back-btn" onclick="goBack()">⬅ Back</button>
+            </form>
+
+            <div id="customerResult" class="hidden result-box">
+                <h3>🎉 Registration Successful!</h3>
+                <p>Customer ID: <span id="generatedCustomerId"></span></p>
+                <p>Password: <span id="generatedCustomerPassword"></span></p>
+            </div>
+        </div>
+
+        <!-- Step 2: Staff form -->
+        <div id="staffRegister" class="hidden form-section">
+            <h2>Staff Registration</h2>
+            <form id="staffForm">
+                <input type="text" id="staff_name" placeholder="Full Name" required>
+                <input type="email" id="staff_email" placeholder="Email" required>
+                <input type="text" id="staff_phone" placeholder="Phone" required>
+                <input type="number" id="staff_age" placeholder="Age" required>
+                <input type="text" id="staff_city" placeholder="City" required>
+                <textarea id="staff_address" placeholder="Address" required></textarea>
+                <button type="submit">Register</button>
+                <button type="button" class="back-btn" onclick="goBack()">⬅ Back</button>
+            </form>
+
+            <div id="staffResult" class="hidden result-box">
+                <h3>🎉 Registration Successful!</h3>
+                <p>Staff ID: <span id="generatedStaffId"></span></p>
+                <p>Password: <span id="generatedStaffPassword"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/reg.js') }}"></script>
+</body>
+</html>

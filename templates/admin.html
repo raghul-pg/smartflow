@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Smart Dispatch System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+    <style>
+        .section { margin-bottom: 40px; padding: 20px; border-radius: 10px; background: #fff7f0; box-shadow: 0 2px 6px #eee;}
+        table { width: 100%; border-collapse: collapse; margin-top:10px;}
+        th, td { padding: 8px 12px; border: 1px solid #e0e0e0; }
+        th { background: #ffeee3;}
+        .img-thumb { width: 60px; }
+        ul { margin: 0; padding-left: 18px; }
+        .add-form input, .add-form select, .add-form textarea { margin-bottom: 6px; width: 95%; }
+        .add-form { background: #f0f7ff; padding: 10px; border-radius: 8px; margin-bottom: 15px;}
+        .success { color: green; font-weight: bold;}
+        .error { color: red; font-weight: bold;}
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);}
+        .modal-content { background:#fff; padding:20px; margin:50px auto; width:400px; border-radius:8px;}
+        .close { float:right; cursor:pointer; }
+    </style>
+</head>
+<body style="background:#f6f6fa;">
+    <div class="navbar">
+        <div class="brand">🚚 Smart Dispatch System</div>
+        <div class="profile-dropdown">
+            <button id="profileBtn">🛡️ {{ user.name }}</button>
+            <div id="dropdownContent" class="dropdown-content">
+                <a href="/admin/profile/{{ user.admin_id }}">👁️ View Profile</a>
+                <a href="/logout">🔒 Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <h2>Welcome, <span style="color:#ff5722;">{{ user.name }}</span> 🛡️</h2>
+        <p>Manage and oversee your dispatch operations efficiently:</p>
+        <div class="cards">
+            <a href="#products" class="card">🛒 Products</a>
+            <a href="#inventory" class="card">🏬 Inventory</a>
+                <a href="#orders" class="card">📦 Orders</a>
+                <a href="#customers" class="card">👥 Customers</a>
+                <a href="#staff" class="card">👨‍💼 Staff</a>
+        </div>
+    <!-- Support Messages Modal -->
+        <!-- Support Messages Modal removed -->
+<!-- Support Messages JavaScript removed -->
+    </div>
+
+    <!-- Product Management -->
+    <div class="section" id="products">
+        <h2>🛒 Product Management</h2>
+        {% if prod_msg %}<p class="{{ 'success' if prod_success else 'error' }}">{{ prod_msg }}</p>{% endif %}
+        <form class="add-form" method="POST" enctype="multipart/form-data" action="{{ url_for('admin_products', user_id=user.admin_id) }}">
+            <input name="name" placeholder="Product Name" required>
+            <input name="category" placeholder="Category" required>
+            <input name="price" type="number" step="0.01" placeholder="Price" required>
+            <!-- stock is handled per warehouse, so remove stock input here -->
+            <textarea name="description" placeholder="Description"></textarea>
+            <select name="status">
+                <option value="available">Available</option>
+                <option value="unavailable">Unavailable</option>
+            </select>
+            <input name="manufacturing_date" type="date" placeholder="Manufacturing Date" required>
+            <input name="image" type="file" accept="image/*">
+            <button type="submit">Add Product</button>
+        </form>
+        <table>
+            <tr>
+                <th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Status</th>
+            </tr>
+            {% for p in products %}
+            <tr>
+                <td>{% if p.image %}<img src="{{ url_for('static', filename='uploads/' + p.image) }}" class="img-thumb">{% endif %}</td>
+                <td>{{ p.name }}</td>
+                <td>{{ p.category }}</td>
+                <td>{{ p.price }}</td>
+                <td>{{ p.status }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+<div class="section">
+    <h2>Manage Warehouses</h2>
+    {% if wh_msg %}
+    {% endif %}
+    <form action="{{ url_for('admin_warehouses', user_id=user.admin_id) }}" method="POST" class="form-inline">
+        <input type="text" name="name" placeholder="Warehouse Name" required>
+        <input type="text" name="address" placeholder="Address" required>
+        <input type="text" name="city" placeholder="City">
+        <input type="text" name="state" placeholder="State">
+        <input type="text" name="zip_code" placeholder="Zip Code">
+        <button type="submit" class="btn btn-primary">Add Warehouse</button>
+    </form>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th><th>Name</th><th>Address</th><th>City</th><th>State</th><th>Zip</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for wh in warehouses %}
+            <tr>
+                <td>{{ wh.id }}</td>
+                <td>{{ wh.name }}</td>
+                <td>{{ wh.address }}</td>
+                <td>{{ wh.city }}</td>
+                <td>{{ wh.state }}</td>
+                <td>{{ wh.zip_code }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Manage Warehouse Stock</h2>
+    {% if stock_msg %}
+    {% endif %}
+
+    <!-- Add / Update Stock Form -->
+    <form action="{{ url_for('admin_warehouse_stock', user_id=user.admin_id) }}" method="POST" class="form-inline">
+        <select name="warehouse_id" required>
+            <option value="">Select Warehouse</option>
+            {% for wh in warehouses %}
+                <option value="{{ wh.id }}">{{ wh.name }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="product_id" required>
+            <option value="">Select Product</option>
+            {% for p in products %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+        </select>
+
+        <input type="number" name="quantity" placeholder="Quantity" min="1" required>
+        <button type="submit" class="btn btn-primary">Add / Update Stock</button>
+    </form>
+
+    <!-- Stock Table -->
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Warehouse</th>
+                <th>Product</th>
+                <th>Quantity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stock %}
+            <tr{% if s.quantity < 100 %} class="low-stock-row"{% endif %}>
+                <td>{{ s.warehouse_name }}</td>
+                <td>{{ s.product_name }}</td>
+                <td>{{ s.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+    <!-- Orders -->
+    <div class="section" id="orders">
+        <h2>📦 Orders</h2>
+        <table>
+            <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>City</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Delivery</th>
+                <th>Total</th>
+                <th>Actions</th>
+            </tr>
+            {% for o in orders %}
+            <tr>
+                <td>{{ o.id }}</td>
+                <td>{{ o.customer_name }}<br>{{ o.email }}</td>
+                <td>{{ o.city }}</td>
+                <td>{{ o.status }}</td>
+                <td>{{ o.order_date }}</td>
+                <td>{{ o.delivery_date or '-' }}</td>
+                <td>{{ o.total_amount }}</td>
+                <td>
+                    <button class="assign-staff-btn" data-id="{{ o.id }}" data-city="{{ o.city }}">Assign Staff</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- Customers -->
+    <div class="section" id="customers">
+        <h2>👥 Customers</h2>
+        <table>
+            <tr>
+                <th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th>
+            </tr>
+            {% for c in customers %}
+            <tr>
+                <td>{{ c.customer_id }}</td>
+                <td>{{ c.name }}</td>
+                <td>{{ c.email }}</td>
+                <td>{{ c.phone }}</td>
+                <td>{{ c.address }}, {{ c.city }}, {{ c.state }}, {{ c.zip_code }}, {{ c.country }}</td>
+                <td>
+                    <button class="edit-btn" data-type="customer" data-id="{{ c.customer_id }}" data-data='{{ c|tojson }}'>Edit</button>
+                    <button class="delete-btn" data-type="customer" data-id="{{ c.customer_id }}">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- Staff -->
+    <div class="section" id="staff">
+        <h2>👨‍💼 Staff</h2>
+        <table>
+            <tr>
+                <th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Actions</th>
+            </tr>
+            {% for s in staff %}
+            <tr>
+                <td>{{ s.staff_id }}</td>
+                <td>{{ s.name }}</td>
+                <td>{{ s.email }}</td>
+                <td>{{ s.phone }}</td>
+                <td>{{ s.city }}</td>
+                <td>
+                    <button class="edit-btn" data-type="staff" data-id="{{ s.staff_id }}" data-data='{{ s|tojson }}'>Edit</button>
+                    <button class="delete-btn" data-type="staff" data-id="{{ s.staff_id }}">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- Modals -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Edit</h3>
+            <form id="editForm">
+                <input type="hidden" id="editType" name="type">
+                <input type="hidden" id="editId" name="id">
+                <div id="editFields"></div>
+                <button type="submit">Save</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Order Details</h3>
+            <div id="orderDetails"></div>
+            <button id="assignStaffBtn">Assign Staff</button>
+        </div>
+    </div>
+
+    <div id="staffAssignModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Assign Staff</h3>
+            <select id="staffSelect"></select>
+            <button id="confirmAssignBtn">Assign</button>
+        </div>
+    </div>
+</body>
+</html>

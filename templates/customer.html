@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/customer.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="brand">🚚 Smart Dispatch System</div>
+        <div class="profile-dropdown">
+            <button id="profileBtn">👤 {{ customer_name }}</button>
+            <div id="dropdownContent" class="dropdown-content">
+                <a href="/customer/profile/{{user.customer_id}}">👁️ View Profile</a>
+                <a href="/logout">🔒 Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <h2>Welcome, <span style="color:#0077cc;">{{ customer_name }}</span> 👋</h2>
+        <p>Here’s what you can do today:</p>
+        <div class="cards">
+            <a href="/order" class="card">📦 Place New Order</a>
+            <button id="viewOrdersBtn" class="card">📋 View My Orders</button>
+            <a href="/customer/track" class="card">🛰️ Track Delivery</a>
+        </div>
+        </div>
+    </div>
+        <div id="ordersSection" style="display:none; margin:2em 0;">
+            <h2>🧾 My Orders</h2>
+            <div id="ordersList">Loading...</div>
+            <button id="closeOrdersBtn" style="margin-top:1em;">Close</button>
+        </div>
+        <div class="about-section">
+        <h2>🚀 About Smart Flow Dispatch</h2>
+        <p>Smart Flow Dispatch is a modern delivery logistics platform tailored for dealers and bulk distributors. 
+        We streamline your dispatch needs with real-time tracking, intelligent delivery assignment, and seamless order processing.</p>
+
+        <div class="info-grid">
+            <div class="info-block">
+                <h3>📌 Services We Offer</h3>
+                <ul>
+                    <li>Real-time delivery tracking</li>
+                    <li>Automated order dispatch</li>
+                    <li>Multi-region staff delivery system</li>
+                    <li>Customer support portal</li>
+                    <li>Smart product analytics (coming soon)</li>
+                </ul>
+            </div>
+
+            <div class="info-block">
+                <h3>🌐 Regions Covered</h3>
+                <p>We currently operate across Tamil Nadu with dedicated delivery zones:</p>
+                <ul>
+                    <li>North TN</li>
+                    <li>South TN</li>
+                    <li>East TN</li>
+                    <li>West TN</li>
+                </ul>
+            </div>
+
+            <div class="info-block">
+                <h3>⭐ Why Choose Us?</h3>
+                <p>✔ Faster deliveries<br>
+                ✔ Transparent tracking<br>
+                ✔ Dealer-focused system<br>
+                ✔ Predictive analytics for seasonal demand<br>
+                ✔ 24/7 Customer assistance</p>
+            </div>
+        </div>
+    </div>
+
+        <script>
+    window.USER_ID = "{{ user.customer_id }}";
+        document.addEventListener('DOMContentLoaded', function() {
+            const viewBtn = document.getElementById('viewOrdersBtn');
+            const ordersSection = document.getElementById('ordersSection');
+            const ordersList = document.getElementById('ordersList');
+            const closeBtn = document.getElementById('closeOrdersBtn');
+            let ordersInterval = null;
+            function fetchOrders() {
+                ordersList.textContent = 'Loading...';
+                fetch(`/api/customer_orders/${window.USER_ID}`)
+                    .then(r => r.json())
+                    .then(orders => {
+                        if (!orders.length) { ordersList.textContent = 'No orders found.'; return; }
+                        ordersList.innerHTML = orders.map(o => `
+                            <div class="order-card" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
+                                <div><strong>Order Code:</strong> ${o.order_code}</div>
+                                <div><strong>Status:</strong> ${o.status}</div>
+                                <div><strong>Date:</strong> ${o.order_date}</div>
+                                <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
+                                <div><strong>Total:</strong> ₹${o.total_amount}</div>
+                                <div><strong>Items:</strong>
+                                    <ul style="margin:0;">
+                                        ${o.items.map(i => `<li>${i.name} × ${i.quantity}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        `).join('');
+                    })
+                    .catch(()=>{ ordersList.textContent = 'Failed to load orders.'; });
+            }
+            viewBtn.addEventListener('click', function() {
+                ordersSection.style.display = 'block';
+                fetchOrders();
+                ordersInterval = setInterval(fetchOrders, 5000);
+            });
+            closeBtn.addEventListener('click', function() {
+                ordersSection.style.display = 'none';
+                clearInterval(ordersInterval);
+            });
+        });
+        </script>
+        <script src="{{ url_for('static', filename='js/customer.js') }}"></script>
+</body>
+</html>

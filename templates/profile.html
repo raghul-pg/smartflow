@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ user_type }} Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+</head>
+<body>
+    <div class="profile-container">
+        <h2>{{ user_type }} Profile</h2>
+        <table>
+            {% for key, value in user.items() %}
+            <tr>
+                <td><b>{{ key.replace('_', ' ').title() }}</b></td>
+                <td>{{ value }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <a class="logout" href="/login">Logout</a>
+    </div>
+</body>
+</html>

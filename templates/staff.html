@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Staff Dashboard | Smart Dispatch</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/staff.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="brand">🚚 Smart Flow Dispatch</div>
+        <div class="profile-dropdown">
+            <button id="profileBtn">{{ staff_name }} 👤</button>
+            <div id="dropdownContent" class="dropdown-content">
+                <a href="/staff/profile/{{user.staff_id}}">👤 View Profile</a>
+                <a href="/logout">🚪 Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero / Welcome Section -->
+    <section class="hero">
+        <div class="hero-text">
+            <h1>Welcome to Smart Dispatch System</h1>
+            <p>Empowering logistics with smart delivery routing and real-time status tracking.</p>
+            <ul>
+                <li>🚚 Assign and manage regional delivery tasks efficiently</li>
+                <li>📦 Track orders with instant status updates</li>
+                <li>📈 Improve dispatch flow using centralized control</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Dashboard Options -->
+    <div class="dashboard">
+        <h2>Hello, {{ staff_name }} 👋</h2>
+        <div class="cards">
+            <button id="viewAssignedOrdersBtn" class="card">📋 View Assigned Orders</button>
+            <a href="/staff/deliver" class="card">✅ Update Delivery Status</a>
+        </div>
+        <div id="assignedOrdersSection" style="display:none; margin-top:0;">
+            <h2>🧾 Assigned Orders</h2>
+            <div id="assignedOrdersList">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Bottom Tagline -->
+    <section class="org-footer">
+        <h2>🚀 Smart Dispatch</h2>
+        <p>Making logistics smoother, faster, and smarter — one delivery at a time.</p>
+    </section>
+
+    <script src="{{ url_for('static', filename='js/staff.js') }}"></script>
+<script>
+window.STAFF_ID = "{{ user.staff_id }}";
+document.addEventListener('DOMContentLoaded', function() {
+    const viewBtn = document.getElementById('viewAssignedOrdersBtn');
+    const ordersSection = document.getElementById('assignedOrdersSection');
+    const ordersList = document.getElementById('assignedOrdersList');
+    let ordersInterval = null;
+    function fetchOrders() {
+        ordersList.textContent = 'Loading...';
+        fetch(`/api/staff_orders/${window.STAFF_ID}`)
+            .then(r => r.json())
+            .then(orders => {
+                if (!orders.length) { ordersList.textContent = 'No assigned orders.'; return; }
+                ordersList.innerHTML = orders.map(o => `
+                    <div class="order-card" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
+                        <div><strong>Order Code:</strong> ${o.order_code}</div>
+                        <div><strong>Status:</strong> ${o.status}</div>
+                        <div><strong>Date:</strong> ${o.order_date}</div>
+                        <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
+                        <div><strong>Customer:</strong> ${o.customer_name} (${o.email})</div>
+                        <div><strong>Total:</strong> ₹${o.total_amount}</div>
+                        <div><strong>Items:</strong>
+                            <ul style="margin:0;">
+                                ${o.items.map(i => `<li>${i.name} × ${i.quantity}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(()=>{ ordersList.textContent = 'Failed to load orders.'; });
+    }
+    viewBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        ordersSection.style.display = 'block';
+        fetchOrders();
+    });
+});
+</script>
+</body>
+</html>

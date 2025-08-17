@@ -1,0 +1,87 @@
+<!-- templates/place_order.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Place Order — Smart Dispatch</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/place_order.css') }}">
+  <script>window.USER_ID = "{{ user_id }}";</script>
+  <script src="{{ url_for('static', filename='js/place_order.js') }}" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🚚 Smart Dispatch</div>
+    <div class="actions">
+      <button id="openCartBtn" class="cart-btn">🛒 <span id="cartCount">0</span></button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Order Products</h1>
+      <p>Browse our catalogue. Click a product to add to cart or use + / − in the card.</p>
+    </section>
+
+    <section id="productGrid" class="grid">
+      <!-- JS will populate product cards -->
+       
+      {% for p in products %}
+      <article class="card" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.price }}" data-img="{{ p.image or '' }}">
+        <div class="card-img">
+          {% if p.image %}
+            <img src="{{ url_for('static', filename='uploads/' ~ p.image) }}" alt="{{ p.name }}">
+          {% else %}
+            <div class="placeholder">No Image</div>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <h3 class="title">{{ p.name }}</h3>
+          <p class="cat">{{ p.category or '' }}</p>
+          <p class="desc">{{ p.description }}</p>
+          <div class="price-row">
+            <div class="price">
+              {% if p.description == '300ml' %}
+                ₹300 per pack (30 pieces)
+              {% elif p.description == '500ml' %}
+                ₹500 per pack (30 pieces)
+              {% elif p.description == '1l' %}
+                ₹600 per pack (30 pieces)
+              {% else %}
+                ₹{{ '%.2f'|format(p.price) }} per pack
+              {% endif %}
+            </div>
+            <div class="controls">
+              <input type="number" class="qty" min="1" value="1" style="width:60px;" placeholder="Packs" />
+            </div>
+          </div>
+          <button class="add-btn">Add to Cart</button>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+  </main>
+
+  <!-- Cart drawer / modal -->
+  <aside id="cartDrawer" class="cart-drawer">
+    <div class="cart-header">
+      <h2>Your Cart</h2>
+      <button id="closeCartBtn" class="close">✕</button>
+    </div>
+    <div id="cartItems" class="cart-items">
+      <!-- items injected by JS -->
+    </div>
+    <div class="cart-footer">
+      <div class="totals">
+        <div>Subtotal: <strong id="cartSubtotal">₹0.00</strong></div>
+      </div>
+      <div class="cart-actions">
+        <button id="clearCartBtn" class="btn ghost">Clear</button>
+        <button id="checkoutBtn" class="btn primary">Placeorder</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- lightweight toast -->
+  <div id="toast" class="toast" style="display:none"></div>
+</body>
+</html>
