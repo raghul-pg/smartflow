@@ -23,7 +23,8 @@
         <div class="cards">
             <a href="/order" class="card">📦 Place New Order</a>
             <button id="viewOrdersBtn" class="card">📋 View My Orders</button>
-            <a href="/customer/track" class="card">🛰️ Track Delivery</a>
+
+
         </div>
         </div>
     </div>
@@ -92,6 +93,9 @@
                                 <div><strong>Date:</strong> ${o.order_date}</div>
                                 <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
                                 <div><strong>Total:</strong> ₹${o.total_amount}</div>
+                                <div><strong>Distance:</strong> ${o.distance_km} km</div>
+                                <div><strong>Transport Cost:</strong> ₹${o.transport_cost}</div>
+                                <div><strong>Estimated Time:</strong> ${o.transport_time_hours} hours</div>
                                 <div><strong>Items:</strong>
                                     <ul style="margin:0;">
                                         ${o.items.map(i => `<li>${i.name} × ${i.quantity}</li>`).join('')}
@@ -112,6 +116,9 @@
                 clearInterval(ordersInterval);
             });
         });
+
+
+
         </script>
         <script src="{{ url_for('static', filename='js/customer.js') }}"></script>
 </body>

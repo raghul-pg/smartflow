@@ -53,11 +53,11 @@
         <h2>🛒 Product Management</h2>
         {% if prod_msg %}<p class="{{ 'success' if prod_success else 'error' }}">{{ prod_msg }}</p>{% endif %}
         <form class="add-form" method="POST" enctype="multipart/form-data" action="{{ url_for('admin_products', user_id=user.admin_id) }}">
-            <input name="name" placeholder="Product Name" required>
-            <input name="category" placeholder="Category" required>
-            <input name="price" type="number" step="0.01" placeholder="Price" required>
-            <!-- stock is handled per warehouse, so remove stock input here -->
-            <textarea name="description" placeholder="Description"></textarea>
+            <input name="name" placeholder="Product Name" required style="width:140px;display:inline-block;">
+            <input name="category" placeholder="Category" required style="width:120px;display:inline-block;">
+            <input name="price" type="number" step="0.01" placeholder="Price" required style="width:90px;display:inline-block;">
+            <input name="unit" placeholder="Unit (e.g. 300ml)" required style="width:90px;display:inline-block;">
+            <input name="expiry_date" type="text" placeholder="Expiry Date (auto-calculated)" readonly style="width:140px;display:inline-block;">
             <select name="status">
                 <option value="available">Available</option>
                 <option value="unavailable">Unavailable</option>
@@ -68,14 +68,17 @@
         </form>
         <table>
             <tr>
-                <th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Status</th>
+                <th>Image</th><th>Name</th><th>Category</th><th>Unit</th><th>Price</th><th>Manufacturing Date</th><th>Expiry Date</th><th>Status</th>
             </tr>
             {% for p in products %}
             <tr>
                 <td>{% if p.image %}<img src="{{ url_for('static', filename='uploads/' + p.image) }}" class="img-thumb">{% endif %}</td>
                 <td>{{ p.name }}</td>
                 <td>{{ p.category }}</td>
+                <td>{{ p.unit }}</td>
                 <td>{{ p.price }}</td>
+                <td>{{ p.manufacturing_date }}</td>
+                <td>{{ p.expiry_date }}</td>
                 <td>{{ p.status }}</td>
             </tr>
             {% endfor %}

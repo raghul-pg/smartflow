@@ -56,7 +56,7 @@ def api_staff_orders(staff_id):
     orders = cursor.fetchall()
     for o in orders:
         cursor.execute('''
-            SELECT oi.product_id, p.name, oi.quantity, oi.price
+            SELECT oi.product_id, p.name, oi.quantity, p.unit
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = %s
@@ -79,7 +79,7 @@ def order():
     user_id = session.get('user_id', '')
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, name, category, price, description, status, image FROM products WHERE status = 'available'")
+    cursor.execute("SELECT id, name, category, price, unit, status, manufacturing_date, expiry_date, image FROM products WHERE status = 'available'")
     products = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -221,7 +221,7 @@ def api_customer_orders(customer_id):
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         SELECT o.id, o.order_code, o.status, o.order_date, o.delivery_date, o.total_amount,
-               w.name AS warehouse_name
+               w.name AS warehouse_name, o.distance_km, o.transport_cost, o.transport_time_hours
         FROM orders o
         JOIN warehouses w ON o.warehouse_id = w.id
         WHERE o.customer_id = %s
@@ -230,7 +230,7 @@ def api_customer_orders(customer_id):
     orders = cursor.fetchall()
     for o in orders:
         cursor.execute("""
-            SELECT oi.product_id, p.name, oi.quantity, oi.price
+            SELECT oi.product_id, p.name, oi.quantity, p.unit
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = %s
@@ -312,7 +312,7 @@ def admin_dashboard(user_id):
     # Attach items to each order
     for o in orders:
         cursor.execute("""
-            SELECT oi.product_id, p.name, oi.quantity, oi.price, p.image
+            SELECT oi.product_id, p.name, oi.quantity, p.unit, p.image
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = %s
@@ -383,9 +383,17 @@ def admin_products(user_id):
         name = request.form['name']
         category = request.form['category']
         price = request.form['price']
-        description = request.form['description']
+        unit = request.form['unit']
         status = request.form['status']
         manufacturing_date = request.form.get('manufacturing_date')
+        # Calculate expiry_date as manufacturing_date + 6 months
+        expiry_date = None
+        if manufacturing_date:
+            try:
+                mfg_date = datetime.datetime.strptime(manufacturing_date, "%Y-%m-%d")
+                expiry_date = (mfg_date + datetime.timedelta(days=182)).strftime("%Y-%m-%d")
+            except Exception:
+                expiry_date = None
         image_filename = None
         if 'image' in request.files:
             file = request.files['image']
@@ -396,9 +404,9 @@ def admin_products(user_id):
                 image_filename = filename
         try:
             cursor.execute('''INSERT INTO products 
-                (name, category, price, description, status, manufacturing_date, image) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s)''',
-                           (name, category, price, description, status, manufacturing_date, image_filename))
+                (name, category, price, unit, status, manufacturing_date, expiry_date, image) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (name, category, price, unit, status, manufacturing_date, expiry_date, image_filename))
             conn.commit()
             prod_msg = "Product added successfully!"
             prod_success = True
@@ -422,7 +430,7 @@ def admin_products(user_id):
     orders = cursor.fetchall()
     for o in orders:
         cursor.execute("""
-            SELECT oi.product_id, p.name, oi.quantity, oi.price, p.image
+            SELECT oi.product_id, p.name, oi.quantity, p.unit, p.image
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = %s
@@ -589,7 +597,7 @@ def admin_warehouse_stock(user_id):
     orders = cursor.fetchall()
     for o in orders:
         cursor.execute("""
-            SELECT oi.product_id, p.name, oi.quantity, oi.price, p.image
+            SELECT oi.product_id, p.name, oi.quantity, p.unit, p.image
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = %s
@@ -668,7 +676,7 @@ def place_order(user_id):
         conn.close()
         return jsonify({"error": "Customer not found"}), 404
 
-    customer_city = customer[0]
+    customer_city = customer[0].strip().lower()
     customer_state = customer[1]
 
     # City-to-zone mapping for warehouse selection
@@ -706,12 +714,16 @@ def place_order(user_id):
             return jsonify({"error": f"Product {p['product_id']} not found"}), 404
         total_amount += price[0] * p['quantity']
 
+    # Calculate transport info
+    wh_city_norm = warehouse_city.strip().lower()
+    km, cost, time_hours = calculate_transport(wh_city_norm, customer_city)
+    if km is None:
+        km, cost, time_hours = 0, 0, 0
     order_code = f"ORD{random.randint(10000, 99999)}"
-
     cursor.execute("""
-        INSERT INTO orders (order_code, customer_id, warehouse_id, status, total_amount)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (order_code, user_id, warehouse_id, 'pending', total_amount))
+        INSERT INTO orders (order_code, customer_id, warehouse_id, status, total_amount, distance_km, transport_cost, transport_time_hours)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (order_code, user_id, warehouse_id, 'pending', total_amount, km, cost, time_hours))
     order_id = cursor.lastrowid
 
     for p in products:
@@ -810,7 +822,7 @@ def generate_order_code(cursor):
 def api_products():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, name, category, price, description, status, manufacturing_date, image FROM products WHERE status IN ('available', 'In Stock', 'available')")
+    cursor.execute("SELECT id, name, category, price, unit, status, manufacturing_date, expiry_date, image FROM products WHERE status IN ('available', 'In Stock', 'available')")
     prods = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -821,7 +833,7 @@ def api_products():
 def place_order_page():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, name, category, price, description, status, image FROM products")
+    cursor.execute("SELECT id, name, category, price, unit, status, manufacturing_date, expiry_date, image FROM products")
     products = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -921,29 +933,33 @@ def api_checkout():
         wh_qty = wh_stock['quantity'] if wh_stock else 0
         if wh_qty >= qty:
             # Deduct all from mapped region warehouse
-            cursor.execute("UPDATE warehouse_stock SET quantity = quantity - %s WHERE warehouse_id = %s AND product_id = %s", (qty, warehouse_id, pid))
+            cursor.execute("UPDATE warehouse_stock SET quantity = quantity - %s, updated_on = NOW() WHERE warehouse_id = %s AND product_id = %s", (qty, warehouse_id, pid))
         else:
             cursor.close()
             conn.close()
             return jsonify({"success": False, "error": f"Product ID {pid} is out of stock in your region warehouse."}), 400
 
     # create order
+    # Calculate transport info
+    wh_city_norm = warehouse_city.strip().lower()
+    km, cost, time_hours = calculate_transport(wh_city_norm, customer_city)
+    if km is None:
+        km, cost, time_hours = 0, 0, 0
     order_code = generate_order_code(cursor)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         cursor.execute("""
-            INSERT INTO orders (order_code, customer_id, warehouse_id, status, order_date, total_amount)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (order_code, customer_id, warehouse_id, 'pending', now, total_amount))
+            INSERT INTO orders (order_code, customer_id, warehouse_id, status, order_date, total_amount, distance_km, transport_cost, transport_time_hours)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (order_code, customer_id, warehouse_id, 'pending', now, total_amount, km, cost, time_hours))
         order_id = cursor.lastrowid
 
         # insert order_items — assumes table exists
         for it in items:
             pid = int(it['product_id'])
             qty = int(it['quantity'])
-            price = float(it.get('price', 0.0))
-            cursor.execute("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (%s,%s,%s,%s)",
-                           (order_id, pid, qty, price))
+            cursor.execute("INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s,%s,%s)",
+                           (order_id, pid, qty))
 
 
         conn.commit()
@@ -956,6 +972,31 @@ def api_checkout():
     cursor.close()
     conn.close()
     return jsonify({"success": True, "order_id": order_id, "order_code": order_code})
+
+# Tamil Nadu city distances from warehouses
+DISTANCES = {
+    "madurai": {
+        "chennai": 460, "madurai": 0, "coimbatore": 215, "tiruchirappalli": 135, "salem": 230, "tirunelveli": 150, "thoothukudi": 150, "dindigul": 65, "theni": 80, "virudhunagar": 50, "ramanathapuram": 110, "sivagangai": 50, "karur": 120, "namakkal": 170, "erode": 210, "tiruppur": 200, "krishnagiri": 320, "dharmapuri": 270, "kanyakumari": 235, "tenkasi": 160, "thanjavur": 180, "thiruvarur": 210, "nagapattinam": 250, "mayiladuthurai": 270, "cuddalore": 290, "villupuram": 310, "kallakurichi": 320, "tiruvannamalai": 350, "vellore": 400, "kanchipuram": 420, "chengalpattu": 430, "tiruvallur": 440, "ranipet": 410, "tirupathur": 390, "perambalur": 140, "ariyalur": 160, "pudukkottai": 90, "nilgiris": 270
+    },
+    "chennai": {
+        "chennai": 0, "madurai": 460, "coimbatore": 510, "tiruchirappalli": 330, "salem": 340, "tirunelveli": 610, "thoothukudi": 610, "dindigul": 420, "theni": 480, "virudhunagar": 510, "ramanathapuram": 530, "sivagangai": 500, "karur": 390, "namakkal": 350, "erode": 400, "tiruppur": 410, "krishnagiri": 250, "dharmapuri": 220, "kanyakumari": 700, "tenkasi": 620, "thanjavur": 340, "thiruvarur": 360, "nagapattinam": 320, "mayiladuthurai": 280, "cuddalore": 180, "villupuram": 160, "kallakurichi": 190, "tiruvannamalai": 190, "vellore": 140, "kanchipuram": 70, "chengalpattu": 60, "tiruvallur": 40, "ranipet": 120, "tirupathur": 180, "perambalur": 270, "ariyalur": 290, "pudukkottai": 350, "nilgiris": 500
+    }
+}
+
+def calculate_transport(warehouse, customer_city):
+    warehouse = warehouse.lower()
+    customer_city = customer_city.lower()
+    print(warehouse," ",customer_city)
+    print("\n")
+    print(DISTANCES[warehouse])
+    print(DISTANCES[warehouse][customer_city])
+    if warehouse in DISTANCES and customer_city in DISTANCES[warehouse]:
+        km = DISTANCES[warehouse][customer_city]
+        cost = km * 5
+        time_hours = round(km / 60, 2)  # 60 km/h
+        return km, cost, time_hours
+    return None, None, None
+
 
 
 @app.route('/logout')

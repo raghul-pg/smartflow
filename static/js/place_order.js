@@ -24,18 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const name = card.dataset.name;
         const price = Number(card.dataset.price);
         const img = card.dataset.img || '';
-        const desc = card.querySelector('.desc')?.textContent?.toLowerCase() || '';
+        const unit = card.querySelector('.desc')?.textContent?.toLowerCase() || '';
         const qty = Number(qtyEl.value);
         if (!qty || qty < 1) {
           showToast('Please enter a valid quantity (at least 1 pack)');
           return;
         }
-        let packPrice = price;
-        // Custom pack price logic
-        if (desc.includes('300ml')) packPrice = 300;
-        else if (desc.includes('500ml')) packPrice = 500;
-        else if (desc.includes('1l')) packPrice = 600;
-        addToCart({ id, name, price: packPrice, img, qty });
+        addToCart({ id, name, price, unit, img, qty });
         showToast(`${name} added to cart (${qty} pack${qty>1?'s':''})`);
       });
     });
@@ -53,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const payload = {
         customer_id,
   items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty })),
-        total_amount: cartTotal()
+  total_amount: cartTotal()
       };
 
       fetch('/api/checkout', {
