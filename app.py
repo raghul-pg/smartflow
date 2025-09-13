@@ -800,7 +800,8 @@ def assign_staff(order_id):
     print(f"[DEBUG] assign_staff called with order_id={order_id}, staff_id={staff_id}")
     db = get_db_connection()
     cur = db.cursor()
-    result = cur.execute("UPDATE orders SET staff_id = %s, status = 'assigned' WHERE id = %s", (staff_id, order_id))
+    # Set status to 'Order Confirmed' when staff is assigned
+    result = cur.execute("UPDATE orders SET staff_id = %s, status = 'Order Confirmed' WHERE id = %s", (staff_id, order_id))
     print(f"[DEBUG] SQL executed, result={result}")
     db.commit()
     db.close()
@@ -1003,6 +1004,61 @@ def calculate_transport(warehouse, customer_city):
 def logout():
     session.clear()
     return render_template('home.html')
+
+# --- API: Update order status ---
+@app.route('/api/update_order_status/<int:order_id>', methods=['POST'])
+def api_update_order_status(order_id):
+    data = request.get_json()
+    new_status = data.get('status')
+    if not new_status:
+        return jsonify({'success': False, 'error': 'No status provided'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE orders SET status = %s WHERE id = %s", (new_status, order_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- API: Order status history (for customer tracking) ---
+@app.route('/api/order_status/<int:order_id>')
+def api_order_status(order_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT status, order_date, delivery_date FROM orders WHERE id = %s", (order_id,))
+    order = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not order:
+        return jsonify({'success': False, 'error': 'Order not found'}), 404
+    # Dummy: In real app, you would store each status change with a timestamp
+    # Here, we infer steps from status and dates
+    status_map = {
+        'confirmed': False,
+        'shipped': False,
+        'out_for_delivery': False,
+        'delivered': False
+    }
+    date_map = {}
+    if order['status'] in ['Order Confirmed', 'Shipped', 'Out For Delivery', 'Delivered']:
+        status_map['confirmed'] = True
+        date_map['confirmed'] = order['order_date']
+    if order['status'] in ['Shipped', 'Out For Delivery', 'Delivered']:
+        status_map['shipped'] = True
+        date_map['shipped'] = order['order_date']
+    if order['status'] in ['Out For Delivery', 'Delivered']:
+        status_map['out_for_delivery'] = True
+        date_map['out_for_delivery'] = order['order_date']
+    if order['status'] == 'Delivered':
+        status_map['delivered'] = True
+        date_map['delivered'] = order['delivery_date']
+    return jsonify({'success': True, 'status': status_map, 'dates': date_map})
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):

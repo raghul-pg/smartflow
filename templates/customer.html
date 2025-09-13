@@ -6,6 +6,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/customer.css') }}">
 </head>
 <body>
+    <div id="trackDeliveryModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:30px 40px;border-radius:10px;min-width:320px;max-width:90vw;">
+            <h3>Order Tracking</h3>
+            <div id="trackingSteps" style="margin:30px 0 10px 0;"></div>
+            <button onclick="document.getElementById('trackDeliveryModal').style.display='none'" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+    <script src="/static/js/track_delivery.js"></script>
     <div class="navbar">
         <div class="brand">🚚 Smart Dispatch System</div>
         <div class="profile-dropdown">
@@ -25,8 +33,6 @@
             <button id="viewOrdersBtn" class="card">📋 View My Orders</button>
 
 
-        </div>
-        </div>
     </div>
         <div id="ordersSection" style="display:none; margin:2em 0;">
             <h2>🧾 My Orders</h2>
@@ -74,48 +80,58 @@
 
         <script>
     window.USER_ID = "{{ user.customer_id }}";
-        document.addEventListener('DOMContentLoaded', function() {
-            const viewBtn = document.getElementById('viewOrdersBtn');
-            const ordersSection = document.getElementById('ordersSection');
-            const ordersList = document.getElementById('ordersList');
-            const closeBtn = document.getElementById('closeOrdersBtn');
-            let ordersInterval = null;
-            function fetchOrders() {
-                ordersList.textContent = 'Loading...';
-                fetch(`/api/customer_orders/${window.USER_ID}`)
-                    .then(r => r.json())
-                    .then(orders => {
-                        if (!orders.length) { ordersList.textContent = 'No orders found.'; return; }
-                        ordersList.innerHTML = orders.map(o => `
-                            <div class="order-card" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
-                                <div><strong>Order Code:</strong> ${o.order_code}</div>
-                                <div><strong>Status:</strong> ${o.status}</div>
-                                <div><strong>Date:</strong> ${o.order_date}</div>
-                                <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
-                                <div><strong>Total:</strong> ₹${o.total_amount}</div>
-                                <div><strong>Distance:</strong> ${o.distance_km} km</div>
-                                <div><strong>Transport Cost:</strong> ₹${o.transport_cost}</div>
-                                <div><strong>Estimated Time:</strong> ${o.transport_time_hours} hours</div>
-                                <div><strong>Items:</strong>
-                                    <ul style="margin:0;">
-                                        ${o.items.map(i => `<li>${i.name} × ${i.quantity}</li>`).join('')}
-                                    </ul>
-                                </div>
+    document.addEventListener('DOMContentLoaded', function() {
+        const viewBtn = document.getElementById('viewOrdersBtn');
+        const ordersSection = document.getElementById('ordersSection');
+        const ordersList = document.getElementById('ordersList');
+        const closeBtn = document.getElementById('closeOrdersBtn');
+        function fetchOrders() {
+            ordersList.textContent = 'Loading...';
+            fetch(`/api/customer_orders/${window.USER_ID}`)
+                .then(r => r.json())
+                .then(orders => {
+                    if (!orders.length) { ordersList.textContent = 'No orders found.'; return; }
+                    ordersList.innerHTML = orders.map(o => `
+                        <div class="order-card" data-order-id="${o.id}" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
+                            <div><strong>Order Code:</strong> ${o.order_code}</div>
+                            <div><strong>Status:</strong> ${o.status}</div>
+                            <div><strong>Date:</strong> ${o.order_date}</div>
+                            <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
+                            <div><strong>Total:</strong> ₹${o.total_amount}</div>
+                            <div><strong>Distance:</strong> ${o.distance_km} km</div>
+                            <div><strong>Transport Cost:</strong> ₹${o.transport_cost}</div>
+                            <div><strong>Estimated Time:</strong> ${o.transport_time_hours} hours</div>
+                            <div><strong>Items:</strong>
+                                <ul style="margin:0;">
+                                    ${o.items.map(i => `<li>${i.name} × ${i.quantity}</li>`).join('')}
+                                </ul>
                             </div>
-                        `).join('');
-                    })
-                    .catch(()=>{ ordersList.textContent = 'Failed to load orders.'; });
-            }
-            viewBtn.addEventListener('click', function() {
-                ordersSection.style.display = 'block';
-                fetchOrders();
-                ordersInterval = setInterval(fetchOrders, 5000);
-            });
-            closeBtn.addEventListener('click', function() {
-                ordersSection.style.display = 'none';
-                clearInterval(ordersInterval);
-            });
+                            <button class="track-delivery-btn" data-order-id="${o.id}" style="margin-top:10px;">Track Delivery</button>
+                        </div>
+                    `).join('');
+                })
+                .catch(()=>{ ordersList.textContent = 'Failed to load orders.'; });
+        }
+        viewBtn.addEventListener('click', function() {
+            ordersSection.style.display = 'block';
+            fetchOrders();
         });
+        closeBtn.addEventListener('click', function() {
+            ordersSection.style.display = 'none';
+        });
+        ordersList.addEventListener('click', function(e) {
+            if (e.target.classList.contains('track-delivery-btn')) {
+                const orderId = e.target.getAttribute('data-order-id');
+                fetch(`/api/order_status/${orderId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.success) { alert('Tracking info not available.'); return; }
+                        renderTrackingSteps(data.status, data.dates||{});
+                        document.getElementById('trackDeliveryModal').style.display = 'flex';
+                    });
+            }
+        });
+    });
 
 
 

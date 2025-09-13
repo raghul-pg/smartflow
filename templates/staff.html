@@ -1,3 +1,4 @@
+            <button id="backToDashboardBtn" style="margin-top:1em;">Back</button>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,7 +36,6 @@
         <h2>Hello, {{ staff_name }} 👋</h2>
         <div class="cards">
             <button id="viewAssignedOrdersBtn" class="card">📋 View Assigned Orders</button>
-            <a href="/staff/deliver" class="card">✅ Update Delivery Status</a>
         </div>
         <div id="assignedOrdersSection" style="display:none; margin-top:0;">
             <h2>🧾 Assigned Orders</h2>
@@ -53,6 +53,9 @@
 <script>
 window.STAFF_ID = "{{ user.staff_id }}";
 document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('backToDashboardBtn').onclick = function() {
+                document.getElementById('assignedOrdersSection').style.display = 'none';
+            };
     const viewBtn = document.getElementById('viewAssignedOrdersBtn');
     const ordersSection = document.getElementById('assignedOrdersSection');
     const ordersList = document.getElementById('assignedOrdersList');
@@ -66,8 +69,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 ordersList.innerHTML = orders.map(o => `
                     <div class="order-card" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
                         <div><strong>Order Code:</strong> ${o.order_code}</div>
-                        <div><strong>Status:</strong> ${o.status}</div>
+                        <div><strong>Status:</strong> <span id="status-${o.id}">${o.status}</span></div>
                         <div><strong>Date:</strong> ${o.order_date}</div>
+                        <button class="update-status-btn" data-order-id="${o.id}" style="margin-top:10px;">Update Delivery Status</button>
+                        <div id="updateStatusDiv-${o.id}" class="update-status-div" style="display:none; margin-top:10px; background:#f9f9f9; padding:10px; border-radius:6px;">
+                            <label for="newStatus-${o.id}">Set Status:</label>
+                            <select id="newStatus-${o.id}">
+                                <option value="Order Confirmed">Order Confirmed</option>
+                                <option value="Shipped">Shipped</option>
+                                <option value="Out For Delivery">Out For Delivery</option>
+                                <option value="Delivered">Delivered</option>
+                            </select>
+                            <button onclick="updateOrderStatus(${o.id})" style="margin-left:10px;">Save</button>
+                            <button onclick="document.getElementById('updateStatusDiv-${o.id}').style.display='none'" style="margin-left:5px;">Cancel</button>
+                        </div>
                         <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
                         <div><strong>Customer:</strong> ${o.customer_name} (${o.email})</div>
                         <div><strong>Total:</strong> ₹${o.total_amount}</div>
@@ -86,6 +101,33 @@ document.addEventListener('DOMContentLoaded', function() {
         ordersSection.style.display = 'block';
         fetchOrders();
     });
+});
+
+function updateOrderStatus(orderId) {
+    const newStatus = document.getElementById(`newStatus-${orderId}`).value;
+    fetch(`/api/update_order_status/${orderId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            document.getElementById(`status-${orderId}`).textContent = newStatus;
+            document.getElementById(`updateStatusDiv-${orderId}`).style.display = 'none';
+            alert('Status updated!');
+        } else {
+            alert('Failed to update status: ' + (res.error || 'Unknown error'));
+        }
+    })
+    .catch(()=>alert('Failed to update status.'));
+}
+
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('update-status-btn')) {
+        const orderId = e.target.getAttribute('data-order-id');
+        document.getElementById(`updateStatusDiv-${orderId}`).style.display = 'block';
+    }
 });
 </script>
 </body>
