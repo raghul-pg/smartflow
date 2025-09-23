@@ -43,12 +43,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // checkout
     checkoutBtn.addEventListener('click', () => {
       if (cart.items.length === 0) { showToast('Cart empty'); return; }
+      // Calculate total quantity across all products
+      const totalQty = cart.items.reduce((sum, item) => sum + item.qty, 0);
+      if (totalQty < 300) {
+        showToast('Minimum total quantity to place order is 300 (can be mixed products)');
+        return;
+      }
       // Use user_id from global JS variable (session)
       const customer_id = window.USER_ID;
       const payload = {
         customer_id,
-  items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty })),
-  total_amount: cartTotal()
+        items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty })),
+        total_amount: cartTotal()
       };
 
       fetch('/api/checkout', {

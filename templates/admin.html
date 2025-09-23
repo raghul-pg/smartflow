@@ -53,18 +53,24 @@
         <h2>🛒 Product Management</h2>
         {% if prod_msg %}<p class="{{ 'success' if prod_success else 'error' }}">{{ prod_msg }}</p>{% endif %}
         <form class="add-form" method="POST" enctype="multipart/form-data" action="{{ url_for('admin_products', user_id=user.admin_id) }}">
-            <input name="name" placeholder="Product Name" required style="width:140px;display:inline-block;">
-            <input name="category" placeholder="Category" required style="width:120px;display:inline-block;">
-            <input name="price" type="number" step="0.01" placeholder="Price" required style="width:90px;display:inline-block;">
-            <input name="unit" placeholder="Unit (e.g. 300ml)" required style="width:90px;display:inline-block;">
-            <input name="expiry_date" type="text" placeholder="Expiry Date (auto-calculated)" readonly style="width:140px;display:inline-block;">
-            <select name="status">
-                <option value="available">Available</option>
-                <option value="unavailable">Unavailable</option>
-            </select>
-            <input name="manufacturing_date" type="date" placeholder="Manufacturing Date" required>
-            <input name="image" type="file" accept="image/*">
-            <button type="submit">Add Product</button>
+            <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                <input name="name" placeholder="Product Name" required style="width:140px;">
+                <input name="category" placeholder="Category" required style="width:120px;">
+                <input name="price" type="number" step="0.01" placeholder="Price" required style="width:90px;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                <input name="unit" placeholder="Unit (e.g. 300ml)" required style="width:90px;">
+                <input name="expiry_date" type="text" placeholder="Expiry Date (auto-calculated)" readonly style="width:110px;">
+                <select name="status" style="width:90px;">
+                    <option value="available">Available</option>
+                    <option value="unavailable">Unavailable</option>
+                </select>
+                <input name="manufacturing_date" type="date" placeholder="Manufacturing Date" required style="width:110px;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 6px; align-items: center;">
+                <input name="image" type="file" accept="image/*" style="width:160px;">
+                <button type="submit" style="width:120px;">Add Product</button>
+            </div>
         </form>
         <table>
             <tr>
@@ -83,6 +89,23 @@
             </tr>
             {% endfor %}
         </table>
+    <script>
+    // Auto-update status to unavailable if expiry date is met in the table (client-side only)
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelectorAll('#products table tr').forEach(function(row, idx) {
+            if(idx === 0) return; // skip header
+            const expiryCell = row.cells[6];
+            const statusCell = row.cells[7];
+            if(expiryCell && statusCell) {
+                const expiry = expiryCell.textContent.trim();
+                if(expiry && expiry <= today) {
+                    statusCell.textContent = 'Unavailable';
+                }
+            }
+        });
+    });
+    </script>
     </div>
 
 <div class="section">

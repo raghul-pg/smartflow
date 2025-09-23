@@ -661,10 +661,18 @@ def place_order(user_id):
     if not products or not isinstance(products, list):
         return jsonify({"error": "Invalid products list"}), 400
 
+
     # Validate all quantities are at least 1
+    total_quantity = 0
     for p in products:
-        if int(p.get('quantity', 0)) < 1:
+        qty = int(p.get('quantity', 0))
+        if qty < 1:
             return jsonify({"error": f"Invalid quantity for product {p.get('product_id', '')}. Must be at least 1."}), 400
+        total_quantity += qty
+
+    # Enforce minimum total quantity of 300
+    if total_quantity < 300:
+        return jsonify({"error": "Minimum total quantity to place an order is 300."}), 400
 
     conn = get_db_connection()
     cursor = conn.cursor()
