@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 import mysql.connector
 import random
@@ -1076,6 +1077,22 @@ BANK_DETAILS = {
     "ifsc": "ICIC0001234",
     "name": "Smart Flow Dispatch"
 }
+# --- API: Product Demand Visualization ---
+@app.route('/api/product_demand')
+def product_demand():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT p.name, SUM(oi.quantity) as total_ordered
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        GROUP BY p.id
+        ORDER BY total_ordered DESC
+    """)
+    data = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify([{'name': row[0], 'total_ordered': row[1]} for row in data])
 
 # All Razorpay logic removed. Manual UPI/Bank Transfer logic is now used.
 

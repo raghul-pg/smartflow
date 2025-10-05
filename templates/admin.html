@@ -266,6 +266,52 @@
         </table>
     </div>
 
+    <!-- Product Demand Visualization -->
+    <div class="section" id="product-demand-visualization">
+        <h2>📊 Product Demand Visualization</h2>
+        <canvas id="demandChart" width="600" height="300"></canvas>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/api/product_demand')
+            .then(res => res.json())
+            .then(data => {
+                const labels = data.map(d => d.name);
+                const values = data.map(d => d.total_ordered);
+                const ctx = document.getElementById('demandChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Product Demand',
+                            data: values,
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: true, text: 'Product Demand (Order Quantity)' }
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'Product' } },
+                            y: { title: { display: true, text: 'Total Ordered' }, beginAtZero: true }
+                        }
+                    }
+                });
+            });
+    });
+
+        // Render the chart
+        const demandChart = new Chart(
+            document.getElementById('demandChart'),
+            config
+        );
+    </script>
+
     <!-- Modals -->
     <div id="editModal" class="modal">
         <div class="modal-content">

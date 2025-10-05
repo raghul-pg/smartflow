@@ -1,8 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/customer.css') }}">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <!-- Modal for Order Tracking -->
+    <div id="trackDeliveryModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:30px 40px;border-radius:10px;min-width:320px;max-width:90vw;">
+            <h3>Order Tracking</h3>
+            <div id="trackingSteps" style="margin:30px 0 10px 0;"></div>
+            <button onclick="document.getElementById('trackDeliveryModal').style.display='none'" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+
+    <!-- Modal for Payment Options -->
+    <div id="paymentModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:30px 40px;border-radius:10px;min-width:320px;max-width:90vw;">
+            <h3>Select Payment Method</h3>
+            <p>Order ID: <span id="paymentOrderId"></span></p>
+            <p>Amount: ₹<span id="paymentAmount"></span></p>
+            <button id="manualPaymentBtn" class="payment-btn" style="background:#28a745;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Manual Payment (Cash on Delivery)</button>
+            <button id="cardPaymentBtn" class="payment-btn" style="background:#0077cc;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Pay via Credit Card</button>
+            <button onclick="document.getElementById('paymentModal').style.display='none'" style="background:#6c757d;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Cancel</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/track_delivery.js') }}"></script>
+    <div class="navbar">
+        <div class="brand">🚚 Smart Dispatch System</div>
+        <div class="profile-dropdown">
+            <button id="profileBtn">👤 {{ customer_name }}</button>
+            <div id="dropdownContent" class="dropdown-content">
+                <a href="/customer/profile/{{user.customer_id}}">👁️ View Profile</a>
+                <a href="/logout">🔒 Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <h2>Welcome, <span style="color:#0077cc;">{{ customer_name }}</span> 👋</h2>
+        <p>Here’s what you can do today:</p>
+        <div class="cards">
+            <a href="/order" class="card">📦 Place New Order</a>
+            <button id="viewOrdersBtn" class="card">📋 View My Orders</button>
+        </div>
+        <div id="ordersSection" style="display:none; margin:2em 0;">
+            <h2>🧾 My Orders</h2>
+            <div id="ordersList">Loading...</div>
+            <button id="closeOrdersBtn" style="margin-top:1em;">Close</button>
+        </div>
+        <div class="about-section">
+            <h2>🚀 About Smart Flow Dispatch</h2>
+            <p>Smart Flow Dispatch is a modern delivery logistics platform tailored for dealers and bulk distributors. 
+            We streamline your dispatch needs with real-time tracking, intelligent delivery assignment, and seamless order processing.</p>
+            <div class="info-grid">
+                <div class="info-block">
+                    <h3>📌 Services We Offer</h3>
+                    <ul>
+                        <li>Real-time delivery tracking</li>
+                        <li>Automated order dispatch</li>
+                        <li>Multi-region staff delivery system</li>
+                        <li>Customer support portal</li>
+                        <li>Smart product analytics (coming soon)</li>
+                    </ul>
+                </div>
+                <div class="info-block">
+                    <h3>🌐 Regions Covered</h3>
+                    <p>We currently operate across Tamil Nadu with dedicated delivery zones:</p>
+                    <ul>
+                        <li>North TN</li>
+                        <li>South TN</li>
+                        <li>East TN</li>
+                        <li>West TN</li>
+                    </ul>
+                </div>
+                <div class="info-block">
+                    <h3>⭐ Why Choose Us?</h3>
+                    <p>✔ Faster deliveries<br>
+                    ✔ Transparent tracking<br>
+                    ✔ Dealer-focused system<br>
+                    ✔ Predictive analytics for seasonal demand<br>
+                    ✔ 24/7 Customer assistance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
     window.USER_ID = "{{ user.customer_id }}";
-    </script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const viewBtn = document.getElementById('viewOrdersBtn');
+        const ordersSection = document.getElementById('ordersSection');
+        const ordersList = document.getElementById('ordersList');
+        const closeBtn = document.getElementById('closeOrdersBtn');
+        const paymentModal = document.getElementById('paymentModal');
+        const paymentOrderId = document.getElementById('paymentOrderId');
+        const paymentAmount = document.getElementById('paymentAmount');
+        const manualPaymentBtn = document.getElementById('manualPaymentBtn');
+        const cardPaymentBtn = document.getElementById('cardPaymentBtn');
+
+        function fetchOrders() {
+            ordersList.textContent = 'Loading...';
+            fetch(`/api/customer_orders/${window.USER_ID}`)
+                .then(r => r.json())
+                .then(orders => {
+                    if (!orders.length) { 
+                        ordersList.textContent = 'No orders found.'; 
+                        return; 
+                    }
+                    ordersList.innerHTML = orders.map(o => {
+                        const isPaid = o.payment_status && o.payment_status.toLowerCase() === 'paid';
+                        return `
+                        <div class="order-card" data-order-id="${o.id}" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
+                            <div><strong>Order Code:</strong> ${o.order_code}</div>
+                            <div><strong>Status:</strong> ${o.status}</div>
+                            <div><strong>Date:</strong> ${o.order_date}</div>
+                            <div><strong>Warehouse:</strong> ${o.warehouse_name}</div>
                             <div><strong>Total:</strong> ₹${o.total_amount}</div>
                             <div><strong>Distance:</strong> ${o.distance_km} km</div>
                             <div><strong>Transport Cost:</strong> ₹${o.transport_cost}</div>
@@ -27,7 +143,137 @@
         }
 
         viewBtn.addEventListener('click', function() {
-            <script>
-            window.USER_ID = "{{ user.customer_id }}";
-            </script>
+            ordersSection.style.display = 'block';
+            fetchOrders();
+        });
 
+        closeBtn.addEventListener('click', function() {
+            ordersSection.style.display = 'none';
+        });
+
+        ordersList.addEventListener('click', function(e) {
+            if (e.target.classList.contains('track-delivery-btn')) {
+                const orderId = e.target.getAttribute('data-order-id');
+                fetch(`/api/order_status/${orderId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.success) { 
+                            alert('Tracking info not available.'); 
+                            return; 
+                        }
+                        renderTrackingSteps(data.status, data.dates || {});
+                        document.getElementById('trackDeliveryModal').style.display = 'flex';
+                    })
+                    .catch(() => {
+                        alert('Error fetching tracking information');
+                    });
+            }
+
+            if (e.target.classList.contains('pay-now-btn')) {
+                const orderId = e.target.getAttribute('data-order-id');
+                const amount = e.target.getAttribute('data-amount');
+                paymentOrderId.textContent = orderId;
+                paymentAmount.textContent = amount;
+                paymentModal.style.display = 'flex';
+                manualPaymentBtn.setAttribute('data-order-id', orderId);
+                cardPaymentBtn.setAttribute('data-order-id', orderId);
+                cardPaymentBtn.setAttribute('data-amount', amount);
+            }
+        });
+
+        manualPaymentBtn.addEventListener('click', async function() {
+            const orderId = this.getAttribute('data-order-id');
+            await updatePaymentMode(orderId, 'manual');
+            paymentModal.style.display = 'none';
+        });
+
+        cardPaymentBtn.addEventListener('click', async function() {
+            const orderId = this.getAttribute('data-order-id');
+            const amount = parseFloat(this.getAttribute('data-amount')) * 100; // Convert to paise
+            try {
+                const res = await fetch('/api/create_razorpay_order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: orderId, amount })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    openRazorpayCheckout(data, orderId);
+                    paymentModal.style.display = 'none';
+                } else {
+                    alert('Failed to create payment order: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error initiating card payment');
+            }
+        });
+
+        async function updatePaymentMode(orderId, mode) {
+            try {
+                const res = await fetch('/api/update_payment_mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: orderId, payment_mode: mode })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Payment mode updated');
+                    fetchOrders();
+                } else {
+                    alert('Failed to update payment mode: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error updating payment mode');
+            }
+        }
+
+        function openRazorpayCheckout(order, orderId) {
+            const options = {
+                key: 'YOUR_RAZORPAY_KEY', // Replace with your Razorpay key
+                amount: order.amount,
+                currency: 'INR',
+                name: 'Smart Flow Dispatch',
+                description: 'Cool Drinks Order Payment',
+                order_id: order.id,
+                handler: function (response) {
+                    verifyPayment(response, orderId);
+                },
+                prefill: {
+                    name: '{{ customer_name }}',
+                    email: '{{ user.email }}',
+                    contact: '{{ user.phone }}'
+                },
+                theme: { color: '#0077cc' }
+            };
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+
+        async function verifyPayment(paymentResponse, orderId) {
+            try {
+                const res = await fetch('/api/verify_payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        order_id: orderId,
+                        payment_id: paymentResponse.razorpay_payment_id,
+                        signature: paymentResponse.razorpay_signature,
+                        razorpay_order_id: paymentResponse.razorpay_order_id
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Payment successful');
+                    fetchOrders();
+                } else {
+                    alert('Payment verification failed: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error verifying payment');
+            }
+        }
+    });
+    </script>
+    <script src="{{ url_for('static', filename='js/customer.js') }}"></script>
+</body>
+</html>
