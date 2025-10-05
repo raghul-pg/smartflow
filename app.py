@@ -1068,6 +1068,19 @@ def api_order_status(order_id):
         date_map['delivered'] = order['delivery_date']
     return jsonify({'success': True, 'status': status_map, 'dates': date_map})
 
+# ... existing imports ...
+
+UPI_ID = "1234567890@okicici"  # Change to your UPI ID
+BANK_DETAILS = {
+    "account_number": "1234567890",
+    "ifsc": "ICIC0001234",
+    "name": "Smart Flow Dispatch"
+}
+
+# All Razorpay logic removed. Manual UPI/Bank Transfer logic is now used.
+
+# ... existing routes ...
+
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
