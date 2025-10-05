@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 import mysql.connector
 import random
+import razorpay
 import json
 import datetime
 from flask import abort
@@ -35,8 +36,8 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='Raghul#2006&',   # change if needed
-        database='soft'            # change if needed
+        password='Lingams@2006',   # change if needed
+        database='cool'            # change if needed
     )
 
 # --- API: Staff assigned orders ---
@@ -1059,6 +1060,246 @@ def api_order_status(order_id):
         status_map['delivered'] = True
         date_map['delivered'] = order['delivery_date']
     return jsonify({'success': True, 'status': status_map, 'dates': date_map})
+
+# ... existing imports ...
+
+# Initialize Razorpay client
+razorpay_client = razorpay.Client(auth=("YOUR_RAZORPAY_KEY", "YOUR_RAZORPAY_SECRET"))
+
+# Update customer profile route to pass user details to template
+@app.route('/customer/profile/<user_id>')
+def customer_profile12(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT customer_id, name, email, phone FROM customers WHERE customer_id = %s", (user_id,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if user:
+        return render_template('customer.html', user=user, customer_name=user['name'])
+    return "Customer not found!", 404
+
+# Update /api/customer_orders/<customer_id> to include payment fields
+@app.route('/api/customer_orders/<customer_id>')
+def api_customer_orders1(customer_id):
+    if 'user_id' not in session or session['user_id'] != customer_id:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT o.id, o.order_code, o.status, o.order_date, o.delivery_date, o.total_amount,
+               w.name AS warehouse_name, o.distance_km, o.transport_cost, o.transport_time_hours,
+               o.payment_status, o.payment_mode
+        FROM orders o
+        JOIN warehouses w ON o.warehouse_id = w.id
+        WHERE o.customer_id = %s
+        ORDER BY o.order_date DESC
+    """, (customer_id,))
+    orders = cursor.fetchall()
+    for o in orders:
+        cursor.execute("""
+            SELECT oi.product_id, p.name, oi.quantity, p.unit
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            WHERE oi.order_id = %s
+        """, (o['id'],))
+        o['items'] = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify(orders)
+
+# API to update payment mode
+@app.route('/api/update_payment_mode', methods=['POST'])
+def update_payment_mode():
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    data = request.json
+    order_id = data.get('order_id')
+    payment_mode = data.get('payment_mode')
+    
+    if not order_id or not payment_mode:
+        return jsonify({"success": False, "error": "Missing order_id or payment_mode"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT customer_id FROM orders WHERE id = %s", (order_id,))
+    order = cursor.fetchone()
+    if not order or order['customer_id'] != session['user_id']:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": "Order not found or unauthorized"}), 404
+    
+    try:
+        cursor.execute("""
+            UPDATE orders 
+            SET payment_mode = %s, payment_status = %s 
+            WHERE id = %s
+        """, (payment_mode, 'Paid' if payment_mode in ['online_qr', 'online_card'] else 'Pending', order_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# API to create Razorpay order for card payments
+@app.route('/api/create_razorpay_order', methods=['POST'])
+def create_razorpay_order():
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    data = request.json
+    order_id = data.get('order_id')
+    amount = data.get('amount')  # In paise
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT customer_id, total_amount FROM orders WHERE id = %s", (order_id,))
+    order = cursor.fetchone()
+    if not order or order['customer_id'] != session['user_id']:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": "Order not found or unauthorized"}), 404
+    
+    try:
+        rz_order = razorpay_client.order.create({
+            "amount": amount,
+            "currency": "INR",
+            "receipt": f"order_{order_id}",
+            "notes": {"order_id": order_id}
+        })
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True, "id": rz_order['id'], "amount": amount})
+    except Exception as e:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# API to create QR code for UPI payment
+@app.route('/api/create_qr_payment', methods=['POST'])
+def create_qr_payment():
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    data = request.json
+    order_id = data.get('order_id')
+    amount = data.get('amount')  # In paise
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT customer_id, total_amount FROM orders WHERE id = %s", (order_id,))
+    order = cursor.fetchone()
+    if not order or order['customer_id'] != session['user_id']:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": "Order not found or unauthorized"}), 404
+    
+    try:
+        qr_data = {
+            "type": "upi_qr",
+            "name": "Smart Flow Dispatch",
+            "usage": "single_use",
+            "fixed_amount": True,
+            "payment_amount": amount,
+            "description": f"Cool Drinks Order {order_id}",
+            "notes": {"order_id": order_id}
+        }
+        qr = razorpay_client.qrcode.create(qr_data)
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True, "qr_url": qr['image_url'], "qr_id": qr['id']})
+    except Exception as e:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# API to verify card payments
+@app.route('/api/verify_payment', methods=['POST'])
+def verify_payment():
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    data = request.json
+    order_id = data.get('order_id')
+    payment_id = data.get('payment_id')
+    signature = data.get('signature')
+    razorpay_order_id = data.get('razorpay_order_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT customer_id FROM orders WHERE id = %s", (order_id,))
+    order = cursor.fetchone()
+    if not order or order['customer_id'] != session['user_id']:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": "Order not found or unauthorized"}), 404
+    
+    try:
+        razorpay_client.utility.verify_payment_signature({
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature
+        })
+        cursor.execute("""
+            UPDATE orders 
+            SET payment_status = 'Paid', payment_mode = 'online_card' 
+            WHERE id = %s
+        """, (order_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": str(e)}), 400
+
+# API to check QR payment status
+@app.route('/api/check_qr_payment/<qr_id>', methods=['GET'])
+def check_qr_payment(qr_id):
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    
+    try:
+        qr = razorpay_client.qrcode.fetch(qr_id)
+        return jsonify({"success": True, "status": qr['status']})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# Webhook for Razorpay events (e.g., QR payment confirmation)
+@app.route('/webhook/razorpay', methods=['POST'])
+def razorpay_webhook():
+    signature = request.headers.get('X-Razorpay-Signature')
+    try:
+        razorpay_client.utility.verify_webhook_signature(
+            request.data.decode('utf-8'),
+            signature,
+            'YOUR_WEBHOOK_SECRET'
+        )
+        payload = request.json
+        if payload['event'] == 'qr.payment_received':
+            order_id = payload['payload']['qrcode']['notes']['order_id']
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE orders 
+                SET payment_status = 'Paid', payment_mode = 'online_qr' 
+                WHERE id = %s
+            """, (order_id,))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+# ... existing routes ...
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):

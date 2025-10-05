@@ -1,0 +1,3 @@
+ALTER TABLE orders
+ADD COLUMN payment_status VARCHAR(50) DEFAULT 'Pending',
+ADD COLUMN payment_mode VARCHAR(50) DEFAULT NULL;
