@@ -1,114 +1,98 @@
+
 body {
-    background: linear-gradient(135deg, #53a6f3 0%, #376ab8 100%);
-    font-family: 'Segoe UI', sans-serif;
     margin: 0;
-    padding: 0;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    background: linear-gradient(120deg, #e8f1fa 0%, #f9fafd 100%);
+    min-height: 100vh;
+    color: #222;
+    position: relative;
+}
+
+.bg-img {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 0;
+    background: url('../img/login-bg.png') center/cover no-repeat;
+    opacity: 0.18;
 }
 
 .login-container {
-    width: 360px;
-    padding: 40px 32px;
-    background: #ffffff;
-    border-radius: 20px;
-    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.15);
-    animation: fadeIn 0.6s ease-out;
-    transition: transform 0.3s;
+    position: relative;
+    z-index: 1;
+    max-width: 400px;
+    margin: 7vh auto 0 auto;
+    background: rgba(255,255,255,0.95);
+    border-radius: 1.2rem;
+    box-shadow: 0 8px 32px rgba(0,119,204,0.13);
+    padding: 2.5rem 2.2rem 2rem 2.2rem;
+    animation: fadeInUp .8s;
 }
 
-.login-container:hover {
-    transform: scale(1.02);
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(40px);}
+    to { opacity: 1; transform: translateY(0);}
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-h2 {
+.login-title {
+    font-size: 2rem;
+    color: #1468b3;
+    font-weight: 700;
+    margin-bottom: 1.2rem;
     text-align: center;
-    color: #376ab8;
-    margin-bottom: 25px;
-    font-size: 26px;
 }
 
-label {
+.login-form label {
     display: block;
-    margin-bottom: 8px;
-    color: #2c3e50;
-    font-weight: 600;
-    font-size: 14px;
+    margin-bottom: 0.5em;
+    color: #1976d2;
+    font-weight: 500;
 }
 
-input[type="text"],
-input[type="password"] {
+.login-form input {
     width: 100%;
-    padding: 12px;
-    margin-bottom: 20px;
-    border: 1px solid #cfd8dc;
-    border-radius: 10px;
-    font-size: 15px;
-    transition: border-color 0.3s, box-shadow 0.3s;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    padding: 0.7em 1em;
+    margin-bottom: 1.2em;
+    border-radius: 0.7em;
+    border: 1px solid #e3eaf1;
+    font-size: 1.08em;
+    background: #f7fbff;
+    transition: border .18s;
 }
-
-input[type="text"]:focus,
-input[type="password"]:focus {
-    border-color: #53a6f3;
-    box-shadow: 0 0 8px rgba(83, 166, 243, 0.4);
+.login-form input:focus {
+    border: 1.5px solid #2e8bff;
     outline: none;
 }
 
-button {
+.login-form button {
     width: 100%;
-    background: linear-gradient(135deg, #53a6f3, #376ab8);
-    color: #fff;
-    padding: 12px;
+    background: linear-gradient(90deg, #1468b3 70%, #5edcff 100%);
+    color: white;
     border: none;
-    border-radius: 10px;
-    font-size: 16px;
+    border-radius: 0.7em;
+    padding: 0.9em 0;
+    font-size: 1.15em;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 5px 15px rgba(55, 106, 184, 0.3);
-    transition: background 0.3s, transform 0.2s;
+    box-shadow: 0 4px 18px rgba(0,119,204,0.09);
+    transition: background .18s;
+}
+.login-form button:hover {
+    background: linear-gradient(90deg, #1976d2 70%, #5edcff 100%);
 }
 
-button:hover {
-    background: linear-gradient(135deg, #376ab8, #2a4e8b);
-    transform: scale(1.03);
-}
-
-.links {
+.login-footer {
     text-align: center;
-    margin-top: 18px;
+    margin-top: 1.5em;
+    color: #888;
+    font-size: 1em;
 }
 
-.links a {
-    color: #376ab8;
-    text-decoration: none;
-    font-size: 14px;
-    transition: color 0.3s;
-}
-
-.links a:hover {
-    color: #000;
-}
-
-.error {
-    background: #ffe6e6;
-    color: #d8000c;
-    padding: 10px 14px;
-    border-radius: 8px;
-    margin-bottom: 15px;
+.error-msg {
+    color: #e53935;
+    background: #fff0f0;
+    border-radius: 0.5em;
+    padding: 0.7em 1em;
+    margin-bottom: 1em;
     text-align: center;
-    box-shadow: 0 2px 10px rgba(255, 0, 0, 0.05);
+    font-weight: 500;
 }

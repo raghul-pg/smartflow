@@ -1,4 +1,5 @@
-
+# --- API: Submit UPI/manual payment proof ---
+from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 import mysql.connector
 import random
@@ -264,7 +265,21 @@ def staff_profile1(user_id):
     if user:
         return render_template('profile.html', user=user, user_type='Staff')
     return "Staff not found!"
-
+@app.route('/admin/emergency_messages')
+def view_emergency_messages():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT e.id, e.message, e.created_at, p.name AS product_name, w.name AS warehouse_name
+        FROM emergency_messages e
+        JOIN products p ON e.product_id = p.id
+        JOIN warehouses w ON e.warehouse_id = w.id
+        ORDER BY e.created_at DESC
+    """)
+    alerts = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify(alerts)
     
 @app.route('/admin/<user_id>', methods=['GET', 'POST'])
 def admin_dashboard(user_id):
@@ -336,8 +351,19 @@ def admin_dashboard(user_id):
         JOIN products p ON ws.product_id = p.id
     """)
     stock = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    # Product demand aggregation
+    conn2 = get_db_connection()
+    cursor2 = conn2.cursor(dictionary=True)
+    cursor2.execute('''
+        SELECT p.name, SUM(oi.quantity) AS total_ordered
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        GROUP BY p.id
+        ORDER BY total_ordered DESC
+    ''')
+    product_demand = cursor2.fetchall()
+    cursor2.close()
+    conn2.close()
 
     return render_template(
         'admin.html',
@@ -350,8 +376,9 @@ def admin_dashboard(user_id):
         stock=stock,
         prod_msg=None,
         prod_success=True,
-        stock_msg=None,   # Pass default values so template won't break
-        stock_success=True
+        stock_msg=None,
+        stock_success=True,
+        product_demand=product_demand
     )
 
 @app.route('/admin/<user_id>/products', methods=['POST'])
@@ -658,26 +685,11 @@ def update_order_status(user_id, order_id):
 def place_order(user_id):
     data = request.json
     products = data.get('products')
-
     if not products or not isinstance(products, list):
         return jsonify({"error": "Invalid products list"}), 400
 
-
-    # Validate all quantities are at least 1
-    total_quantity = 0
-    for p in products:
-        qty = int(p.get('quantity', 0))
-        if qty < 1:
-            return jsonify({"error": f"Invalid quantity for product {p.get('product_id', '')}. Must be at least 1."}), 400
-        total_quantity += qty
-
-    # Enforce minimum total quantity of 300
-    if total_quantity < 300:
-        return jsonify({"error": "Minimum total quantity to place an order is 300."}), 400
-
     conn = get_db_connection()
     cursor = conn.cursor()
-
     cursor.execute("SELECT city, state FROM customers WHERE customer_id = %s", (user_id,))
     customer = cursor.fetchone()
     if not customer:
@@ -686,15 +698,9 @@ def place_order(user_id):
         return jsonify({"error": "Customer not found"}), 404
 
     customer_city = customer[0].strip().lower()
-    customer_state = customer[1]
+    ZONE_A_CITIES = ["chennai", "tiruvallur", "kanchipuram", "chengalpattu", ...]  # (your list)
+    ZONE_B_CITIES = ["madurai", "dindigul", "theni", ...]  # (your list)
 
-    # City-to-zone mapping for warehouse selection
-    ZONE_A_CITIES = [
-        "chennai", "tiruvallur", "kanchipuram", "chengalpattu", "ranipet", "vellore", "tirupathur", "tiruvannamalai", "villupuram", "kallakurichi", "cuddalore", "mayiladuthurai", "nagapattinam", "thanjavur", "tiruvarur", "ariyalur", "perambalur", "pudukkottai", "tiruchirappalli"
-    ]
-    ZONE_B_CITIES = [
-        "madurai", "dindigul", "theni", "sivagangai", "ramanathapuram", "virudhunagar", "tirunelveli", "thoothukudi", "kanyakumari", "tenkasi", "coimbatore", "tiruppur", "erode", "namakkal", "karur", "salem", "dharmapuri", "krishnagiri", "nilgiris"
-    ]
     warehouse_city = None
     if customer_city in ZONE_A_CITIES:
         warehouse_city = "Chennai"
@@ -711,59 +717,74 @@ def place_order(user_id):
         cursor.close()
         conn.close()
         return jsonify({"error": "No warehouse found for mapped city"}), 400
-    warehouse_id = wh_result[0]
 
+    warehouse_id = wh_result[0]
     total_amount = 0
+    order_items = []
+
+    # Check stock and calculate total
     for p in products:
-        cursor.execute("SELECT price FROM products WHERE id = %s", (p['product_id'],))
-        price = cursor.fetchone()
-        if not price:
+        product_id = p['product_id']
+        quantity = p['quantity']
+        if quantity < 1:
             cursor.close()
             conn.close()
-            return jsonify({"error": f"Product {p['product_id']} not found"}), 404
-        total_amount += price[0] * p['quantity']
+            return jsonify({"error": f"Invalid quantity for product {product_id}. Must be at least 1."}), 400
+
+        cursor.execute("SELECT price FROM products WHERE id = %s", (product_id,))
+        price_row = cursor.fetchone()
+        if not price_row:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": f"Product {product_id} not found"}), 404
+
+        price = price_row[0]
+        total_amount += price * quantity
+        order_items.append((product_id, quantity, price * quantity))
+
+        # Check stock
+        cursor.execute("SELECT quantity FROM warehouse_stock WHERE warehouse_id = %s AND product_id = %s", (warehouse_id, product_id))
+        stock_row = cursor.fetchone()
+        stock_qty = stock_row[0] if stock_row else 0
+        if stock_qty < quantity:
+            # Record emergency message
+            alert_msg = f"Product ID {product_id} is out of stock in warehouse {warehouse_city}. Customer {user_id} attempted to order {quantity} units."
+            cursor.execute("""
+                INSERT INTO emergency_messages (product_id, warehouse_id, message)
+                VALUES (%s, %s, %s)
+            """, (product_id, warehouse_id, alert_msg))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return jsonify({"success": False, "error": f"Product ID {product_id} is out of stock. Admin has been notified to restock soon."}), 400
 
     # Calculate transport info
-    wh_city_norm = warehouse_city.strip().lower()
-    km, cost, time_hours = calculate_transport(wh_city_norm, customer_city)
+    km, cost, time_hours = calculate_transport(warehouse_city.lower(), customer_city)
     if km is None:
         km, cost, time_hours = 0, 0, 0
+
     order_code = f"ORD{random.randint(10000, 99999)}"
     cursor.execute("""
         INSERT INTO orders (order_code, customer_id, warehouse_id, status, total_amount, distance_km, transport_cost, transport_time_hours)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (order_code, user_id, warehouse_id, 'pending', total_amount, km, cost, time_hours))
     order_id = cursor.lastrowid
 
-    for p in products:
-        cursor.execute("SELECT price FROM products WHERE id = %s", (p['product_id'],))
-        price = cursor.fetchone()[0]
+    # Deduct stock and add order items
+    for product_id, quantity, item_total in order_items:
+        cursor.execute("""
+            UPDATE warehouse_stock
+            SET quantity = quantity - %s
+            WHERE warehouse_id = %s AND product_id = %s
+        """, (quantity, warehouse_id, product_id))
         cursor.execute("""
             INSERT INTO order_items (order_id, product_id, quantity, price)
             VALUES (%s, %s, %s, %s)
-        """, (order_id, p['product_id'], p['quantity'], price * p['quantity']))
-
-        # Check stock in mapped region warehouse only
-        cursor.execute("SELECT quantity FROM warehouse_stock WHERE warehouse_id = %s AND product_id = %s", (warehouse_id, p['product_id']))
-        qty_needed = p['quantity']
-        wh_stock = cursor.fetchone()
-        wh_qty = wh_stock[0] if wh_stock else 0
-        if wh_qty >= qty_needed:
-            # Deduct all from mapped region warehouse
-            cursor.execute("""
-                UPDATE warehouse_stock
-                SET quantity = quantity - %s
-                WHERE warehouse_id = %s AND product_id = %s
-            """, (qty_needed, warehouse_id, p['product_id']))
-        else:
-            cursor.close()
-            conn.close()
-            return jsonify({"error": f"Product {p['product_id']} is out of stock in your region warehouse."}), 400
+        """, (order_id, product_id, quantity, item_total))
 
     conn.commit()
     cursor.close()
     conn.close()
-
     return jsonify({"message": "Order placed successfully", "order_code": order_code}), 201
 
 # ===== ORDER DETAILS =====
@@ -874,7 +895,6 @@ def place_order_page():
     
     return render_template('place_order.html', products=products)
 '''
-# --- API Checkout: creates order and order_items ---
 @app.route('/api/checkout', methods=['POST'])
 def api_checkout():
     data = request.get_json()
@@ -1071,32 +1091,62 @@ def api_order_status(order_id):
 
 # ... existing imports ...
 
-UPI_ID = "1234567890@okicici"  # Change to your UPI ID
-BANK_DETAILS = {
-    "account_number": "1234567890",
-    "ifsc": "ICIC0001234",
-    "name": "Smart Flow Dispatch"
-}
-# --- API: Product Demand Visualization ---
-@app.route('/api/product_demand')
-def product_demand():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT p.name, SUM(oi.quantity) as total_ordered
-        FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
-        GROUP BY p.id
-        ORDER BY total_ordered DESC
-    """)
-    data = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return jsonify([{'name': row[0], 'total_ordered': row[1]} for row in data])
 
-# All Razorpay logic removed. Manual UPI/Bank Transfer logic is now used.
 
 # ... existing routes ...
+@app.route('/api/submit_upi_payment', methods=['POST'])
+def submit_upi_payment():
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    order_id = request.form.get('order_id')
+    transaction_id = request.form.get('transaction_id')
+    file = request.files.get('payment_proof')
+    if not order_id or not transaction_id or not file:
+        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE orders SET payment_status='Pending', payment_mode='upi', transaction_id=%s, payment_proof=%s WHERE id=%s AND customer_id=%s
+        """, (transaction_id, filename, order_id, session['user_id']))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# --- API: Update payment mode (manual payment) ---
+@app.route('/api/update_payment_mode', methods=['POST'])
+def update_payment_mode():
+    if 'user_id' not in session or not session['user_id'].startswith('cs'):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    order_id = request.form.get('order_id')
+    payment_mode = request.form.get('payment_mode')
+    if not order_id or not payment_mode:
+        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE orders SET payment_status='Pending', payment_mode=%s WHERE id=%s AND customer_id=%s
+        """, (payment_mode, order_id, session['user_id']))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):

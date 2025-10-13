@@ -35,6 +35,40 @@
 
     <div class="dashboard">
         <h2>Welcome, <span style="color:#ff5722;">{{ user.name }}</span> 🛡️</h2>
+        <div class="section" id="emergency">
+    <h2>🚨 Emergency Stock Alerts</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Warehouse</th>
+                <th>Message</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody id="emergencyTable">
+            <tr><td colspan="4">Loading alerts...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+async function loadEmergencyMessages() {
+    const res = await fetch('/admin/emergency_messages');
+    const data = await res.json();
+    const tbody = document.getElementById('emergencyTable');
+    tbody.innerHTML = data.length ? data.map(e => `
+        <tr>
+            <td>${e.product_name}</td>
+            <td>${e.warehouse_name}</td>
+            <td>${e.message}</td>
+            <td>${new Date(e.created_at).toLocaleString()}</td>
+        </tr>`).join('') : '<tr><td colspan="4">✅ No emergency alerts!</td></tr>';
+}
+loadEmergencyMessages();
+setInterval(loadEmergencyMessages, 15000); // auto-refresh every 15 sec
+</script>
+
         <p>Manage and oversee your dispatch operations efficiently:</p>
         <div class="cards">
             <a href="#products" class="card">🛒 Products</a>
@@ -53,28 +87,23 @@
         <h2>🛒 Product Management</h2>
         {% if prod_msg %}<p class="{{ 'success' if prod_success else 'error' }}">{{ prod_msg }}</p>{% endif %}
         <form class="add-form" method="POST" enctype="multipart/form-data" action="{{ url_for('admin_products', user_id=user.admin_id) }}">
-            <div style="display: flex; gap: 10px; margin-bottom: 6px;">
-                <input name="name" placeholder="Product Name" required style="width:140px;">
-                <input name="category" placeholder="Category" required style="width:120px;">
-                <input name="price" type="number" step="0.01" placeholder="Price" required style="width:90px;">
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 6px;">
-                <input name="unit" placeholder="Unit (e.g. 300ml)" required style="width:90px;">
-                <input name="expiry_date" type="text" placeholder="Expiry Date (auto-calculated)" readonly style="width:110px;">
-                <select name="status" style="width:90px;">
-                    <option value="available">Available</option>
-                    <option value="unavailable">Unavailable</option>
-                </select>
-                <input name="manufacturing_date" type="date" placeholder="Manufacturing Date" required style="width:110px;">
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 6px; align-items: center;">
-                <input name="image" type="file" accept="image/*" style="width:160px;">
-                <button type="submit" style="width:120px;">Add Product</button>
-            </div>
+            <input name="name" placeholder="Product Name" required style="width:140px;display:inline-block;">
+            <input name="category" placeholder="Category" required style="width:120px;display:inline-block;">
+            <input name="price" type="number" step="0.01" placeholder="Price" required style="width:90px;display:inline-block;">
+            <input name="unit" placeholder="Unit (e.g. 300ml)" required style="width:90px;display:inline-block;">
+            <input name="expiry_date" type="text" placeholder="Expiry Date (auto-calculated)" readonly style="width:140px;display:inline-block;">
+            <select name="status" style="width:80px;display:inline-block;">
+                <option value="available">Available</option>
+                <option value="unavailable">Unavailable</option>
+            </select>
+            <br>
+            <input name="manufacturing_date" type="date" placeholder="Manufacturing Date" required style="width:100px;display:inline-block; margin-top:4px;">
+            <input name="image" type="file" accept="image/*" style="margin-top:4px;">
+            <button type="submit" style="margin-top:4px;">Add Product</button>
         </form>
         <table>
             <tr>
-                <th>Image</th><th>Name</th><th>Category</th><th>Unit</th><th>Price</th><th>Manufacturing Date</th><th>Expiry Date</th><th>Status</th>
+                <th>Image</th><th>Name</th><th>Category</th><th>Unit</th><th>Price</th><th style="width:90px;">Manufacturing Date</th><th>Expiry Date</th><th style="width:70px;">Status</th>
             </tr>
             {% for p in products %}
             <tr>
@@ -83,29 +112,12 @@
                 <td>{{ p.category }}</td>
                 <td>{{ p.unit }}</td>
                 <td>{{ p.price }}</td>
-                <td>{{ p.manufacturing_date }}</td>
+                <td style="width:90px;">{{ p.manufacturing_date }}</td>
                 <td>{{ p.expiry_date }}</td>
-                <td>{{ p.status }}</td>
+                <td style="width:70px;">{{ p.status }}</td>
             </tr>
             {% endfor %}
         </table>
-    <script>
-    // Auto-update status to unavailable if expiry date is met in the table (client-side only)
-    document.addEventListener('DOMContentLoaded', function() {
-        const today = new Date().toISOString().split('T')[0];
-        document.querySelectorAll('#products table tr').forEach(function(row, idx) {
-            if(idx === 0) return; // skip header
-            const expiryCell = row.cells[6];
-            const statusCell = row.cells[7];
-            if(expiryCell && statusCell) {
-                const expiry = expiryCell.textContent.trim();
-                if(expiry && expiry <= today) {
-                    statusCell.textContent = 'Unavailable';
-                }
-            }
-        });
-    });
-    </script>
     </div>
 
 <div class="section">
@@ -199,7 +211,7 @@
                 <th>City</th>
                 <th>Status</th>
                 <th>Date</th>
-                <th>Delivery</th>
+                    <th>Payment Status</th>
                 <th>Total</th>
                 <th>Actions</th>
             </tr>
@@ -210,7 +222,7 @@
                 <td>{{ o.city }}</td>
                 <td>{{ o.status }}</td>
                 <td>{{ o.order_date }}</td>
-                <td>{{ o.delivery_date or '-' }}</td>
+                    <td>{{ o.payment_status or '-' }}</td>
                 <td>{{ o.total_amount }}</td>
                 <td>
                     <button class="assign-staff-btn" data-id="{{ o.id }}" data-city="{{ o.city }}">Assign Staff</button>
@@ -266,52 +278,6 @@
         </table>
     </div>
 
-    <!-- Product Demand Visualization -->
-    <div class="section" id="product-demand-visualization">
-        <h2>📊 Product Demand Visualization</h2>
-        <canvas id="demandChart" width="600" height="300"></canvas>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        fetch('/api/product_demand')
-            .then(res => res.json())
-            .then(data => {
-                const labels = data.map(d => d.name);
-                const values = data.map(d => d.total_ordered);
-                const ctx = document.getElementById('demandChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Product Demand',
-                            data: values,
-                            backgroundColor: 'rgba(54, 162, 235, 0.6)'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { display: false },
-                            title: { display: true, text: 'Product Demand (Order Quantity)' }
-                        },
-                        scales: {
-                            x: { title: { display: true, text: 'Product' } },
-                            y: { title: { display: true, text: 'Total Ordered' }, beginAtZero: true }
-                        }
-                    }
-                });
-            });
-    });
-
-        // Render the chart
-        const demandChart = new Chart(
-            document.getElementById('demandChart'),
-            config
-        );
-    </script>
-
     <!-- Modals -->
     <div id="editModal" class="modal">
         <div class="modal-content">
@@ -343,5 +309,48 @@
             <button id="confirmAssignBtn">Assign</button>
         </div>
     </div>
+</body>
+    <div class="section" id="product-demand-visualization" style="background:linear-gradient(90deg,#e3ffe3 0%,#fff7f0 100%);box-shadow:0 2px 8px #d0f0d0;margin-top:40px;">
+        <h2 style="color:#2196f3;">Product Demand Visualization</h2>
+        <p style="margin-bottom:10px;color:#555;">current demand products</p>
+        <canvas id="demandChart" style="max-width:700px;height:320px;margin:auto;display:block;background:#fff;border-radius:12px;"></canvas>
+        <div id="topProduct" style="margin-top:10px;font-weight:bold;color:#388e3c;"></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        var productDemand = {{ product_demand|tojson|safe }};
+        const labels = productDemand.map(d => d.name);
+        const values = productDemand.map(d => d.total_ordered);
+        const topIdx = values.length ? values.indexOf(Math.max(...values)) : -1;
+        const topProduct = topIdx >= 0 ? labels[topIdx] : 'None';
+        document.getElementById('topProduct').innerHTML = topProduct !== 'None' ? `Currently in demand: <span style='color:#1976d2;'>${topProduct}</span>` : 'No orders yet.';
+        const ctx = document.getElementById('demandChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Order Quantity',
+                    data: values,
+                    backgroundColor: labels.map((l,i) => i === topIdx ? 'rgba(255,99,132,0.7)' : 'rgba(54,162,235,0.5)'),
+                    borderColor: labels.map((l,i) => i === topIdx ? '#d32f2f' : '#1976d2'),
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Live Product Demand', color:'#1976d2', font:{size:18} },
+                    tooltip: { enabled: true }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Product', color:'#1976d2' }, ticks:{color:'#1976d2'} },
+                    y: { title: { display: true, text: 'Total Ordered', color:'#1976d2' }, beginAtZero: true, ticks:{color:'#1976d2'} }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

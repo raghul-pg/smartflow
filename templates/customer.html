@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Customer Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/customer.css') }}">
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
     <!-- Modal for Order Tracking -->
@@ -23,48 +22,106 @@
             <p>Order ID: <span id="paymentOrderId"></span></p>
             <p>Amount: ₹<span id="paymentAmount"></span></p>
             <button id="manualPaymentBtn" class="payment-btn" style="background:#28a745;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Manual Payment (Cash on Delivery)</button>
-            <button id="cardPaymentBtn" class="payment-btn" style="background:#0077cc;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Pay via Credit Card</button>
+            <button id="upiPaymentBtn" class="payment-btn" style="background:#0077cc;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Pay via UPI</button>
             <button onclick="document.getElementById('paymentModal').style.display='none'" style="background:#6c757d;color:white;padding:10px 20px;border:none;border-radius:5px;margin:10px;">Cancel</button>
-        </div>
-    </div>
-
-    <script src="{{ url_for('static', filename='js/track_delivery.js') }}"></script>
-    <div class="navbar">
-        <div class="brand">🚚 Smart Dispatch System</div>
-        <div class="profile-dropdown">
-            <button id="profileBtn">👤 {{ customer_name }}</button>
-            <div id="dropdownContent" class="dropdown-content">
-                <a href="/customer/profile/{{user.customer_id}}">👁️ View Profile</a>
-                <a href="/logout">🔒 Logout</a>
+            <div id="upiDetails" style="display:none;margin-top:20px;">
+                <h4>UPI Payment Details</h4>
+                <p>Send payment to: <b>smartflow@upi</b></p>
+                <form id="upiProofForm" enctype="multipart/form-data">
+                    <label>Transaction ID:<br><input type="text" id="transactionIdInput" name="transaction_id" required style="width:100%;margin-bottom:10px;"></label><br>
+                    <label>Upload Payment Proof:<br><input type="file" id="paymentProofInput" name="payment_proof" accept="image/*" required></label><br>
+                    <button type="submit" style="background:#28a745;color:white;padding:8px 18px;border:none;border-radius:5px;margin-top:10px;">Submit Payment Proof</button>
+                </form>
             </div>
         </div>
     </div>
 
-    <div class="dashboard">
-        <h2>Welcome, <span style="color:#0077cc;">{{ customer_name }}</span> 👋</h2>
-        <p>Here’s what you can do today:</p>
+    <script src="{{ url_for('static', filename='js/track_delivery.js') }}"></script>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="brand">🚚 <span>Dispatch System</span></div>
+        <div class="profile-dropdown">
+            <button id="profileBtn">{{ customer_name }} 👤</button>
+            <div id="dropdownContent" class="dropdown-content">
+                <a href="/customer/profile/{{user.customer_id}}">� View Profile</a>
+                <a href="#" id="themeToggle">🌓 Toggle Theme</a>
+                <a href="/logout">� Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-text">
+            <h1>Welcome to Smart Dispatch System</h1>
+            <p>Effortless order placement, transparent tracking, and fast deliveries for dealers and distributors.</p>
+            <ul>
+                <li>📦 Place and track your orders instantly</li>
+                <li>🚚 View delivery status and payment info</li>
+                <li>📈 Get analytics and support</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Dashboard Section -->
+    <main class="dashboard">
+        <header class="dashboard-header">
+            <h2>Hello, <span class="customer-highlight">{{ customer_name }}</span> 👋</h2>
+            <p style="color:#888;margin-top:4px;">Your personalized order dashboard</p>
+        </header>
         <div class="cards">
-            <a href="/order" class="card">📦 Place New Order</a>
-            <button id="viewOrdersBtn" class="card">📋 View My Orders</button>
+            <a href="/order" class="card small-card">📦 Place New Order</a>
+            <button id="viewOrdersBtn" class="card small-card">📋 View My Orders</button>
+            <button id="quickProfileBtn" class="card small-card">👤 Quick Profile</button>
+            <button id="helpBtn" class="card small-card">❓ Help</button>
+            <button id="refreshBtn" class="card small-card">🔄 Refresh</button>
         </div>
-        <div id="ordersSection" style="display:none; margin:2em 0;">
-            <h2>🧾 My Orders</h2>
-            <div id="ordersList">Loading...</div>
-            <button id="closeOrdersBtn" style="margin-top:1em;">Close</button>
-        </div>
-        <div class="about-section">
-            <h2>🚀 About Smart Flow Dispatch</h2>
-            <p>Smart Flow Dispatch is a modern delivery logistics platform tailored for dealers and bulk distributors. 
-            We streamline your dispatch needs with real-time tracking, intelligent delivery assignment, and seamless order processing.</p>
+
+        <section id="ordersSection" class="orders-section" style="display:none;">
+            <div class="section-header">
+                <h2>🧾 My Orders</h2>
+                <button id="closeOrdersBtn" class="back-btn">Close</button>
+            </div>
+            <div id="ordersList" class="orders-list">Loading...</div>
+        </section>
+
+        <section id="profileQuickView" class="orders-section" style="display:none;">
+            <div class="section-header">
+                <h2>👤 Profile Quick View</h2>
+                <button id="closeProfileQuick" class="back-btn">Close</button>
+            </div>
+            <div id="profileQuickContent" style="padding:1.2em;"></div>
+        </section>
+
+        <section id="helpSection" class="orders-section" style="display:none;">
+            <div class="section-header">
+                <h2>❓ Help & Tips</h2>
+                <button id="closeHelp" class="back-btn">Close</button>
+            </div>
+            <div style="padding:1.2em;">
+                <ul style="font-size:1.08em;color:#1976d2;">
+                    <li>Click <b>Place New Order</b> to start a new purchase.</li>
+                    <li>Use <b>View My Orders</b> to track and pay for your orders.</li>
+                    <li>Quick Profile gives you a summary of your info.</li>
+                    <li>Toggle between light/dark mode for comfort.</li>
+                    <li>Contact support for help or issues.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="about-section">
+            <h2>About Dispatch</h2>
+            <p>Dispatch System is a modern delivery logistics platform tailored for dealers and bulk distributors. We streamline your dispatch needs with tracking, delivery assignment, and seamless order processing.</p>
             <div class="info-grid">
                 <div class="info-block">
                     <h3>📌 Services We Offer</h3>
                     <ul>
-                        <li>Real-time delivery tracking</li>
-                        <li>Automated order dispatch</li>
+                        <li>Delivery tracking</li>
+                        <li>Order dispatch</li>
                         <li>Multi-region staff delivery system</li>
-                        <li>Customer support portal</li>
-                        <li>Smart product analytics (coming soon)</li>
+                        <li>Product analytics</li>
                     </ul>
                 </div>
                 <div class="info-block">
@@ -80,18 +137,45 @@
                 <div class="info-block">
                     <h3>⭐ Why Choose Us?</h3>
                     <p>✔ Faster deliveries<br>
-                    ✔ Transparent tracking<br>
+                    ✔ tracking<br>
                     ✔ Dealer-focused system<br>
-                    ✔ Predictive analytics for seasonal demand<br>
-                    ✔ 24/7 Customer assistance</p>
+                    ✔ Predictive analytics for seasonal demand</p>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="org-footer">
+        <h2>Dispatch System</h2>
+        <p>Making logistics smoother, faster, and smarter — one delivery at a time.</p>
+    </footer>
 
     <script>
     window.USER_ID = "{{ user.customer_id }}";
     document.addEventListener('DOMContentLoaded', function() {
+        // Refresh Button Logic
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            window.location.reload();
+        });
+        // Profile dropdown toggle
+        const profileBtn = document.getElementById('profileBtn');
+        const dropdown = document.getElementById('dropdownContent');
+        profileBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('show');
+        });
+        document.body.addEventListener('click', function() {
+            dropdown.classList.remove('show');
+        });
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.body.classList.toggle('dark-theme');
+        });
+
+        // Main dashboard logic
         const viewBtn = document.getElementById('viewOrdersBtn');
         const ordersSection = document.getElementById('ordersSection');
         const ordersList = document.getElementById('ordersList');
@@ -100,7 +184,11 @@
         const paymentOrderId = document.getElementById('paymentOrderId');
         const paymentAmount = document.getElementById('paymentAmount');
         const manualPaymentBtn = document.getElementById('manualPaymentBtn');
-        const cardPaymentBtn = document.getElementById('cardPaymentBtn');
+        const upiPaymentBtn = document.getElementById('upiPaymentBtn');
+        const upiDetails = document.getElementById('upiDetails');
+        const upiProofForm = document.getElementById('upiProofForm');
+        const transactionIdInput = document.getElementById('transactionIdInput');
+        const paymentProofInput = document.getElementById('paymentProofInput');
 
         function fetchOrders() {
             ordersList.textContent = 'Loading...';
@@ -114,7 +202,7 @@
                     ordersList.innerHTML = orders.map(o => {
                         const isPaid = o.payment_status && o.payment_status.toLowerCase() === 'paid';
                         return `
-                        <div class="order-card" data-order-id="${o.id}" style="border:1px solid #ccc; padding:1em; margin-bottom:1em;">
+                        <div class="order-card" data-order-id="${o.id}">
                             <div><strong>Order Code:</strong> ${o.order_code}</div>
                             <div><strong>Status:</strong> ${o.status}</div>
                             <div><strong>Date:</strong> ${o.order_date}</div>
@@ -144,6 +232,8 @@
 
         viewBtn.addEventListener('click', function() {
             ordersSection.style.display = 'block';
+            document.getElementById('profileQuickView').style.display = 'none';
+            document.getElementById('helpSection').style.display = 'none';
             fetchOrders();
         });
 
@@ -176,103 +266,96 @@
                 paymentAmount.textContent = amount;
                 paymentModal.style.display = 'flex';
                 manualPaymentBtn.setAttribute('data-order-id', orderId);
-                cardPaymentBtn.setAttribute('data-order-id', orderId);
-                cardPaymentBtn.setAttribute('data-amount', amount);
+                upiPaymentBtn.setAttribute('data-order-id', orderId);
+                upiDetails.style.display = 'none';
+                upiProofForm.reset();
             }
         });
 
         manualPaymentBtn.addEventListener('click', async function() {
             const orderId = this.getAttribute('data-order-id');
-            await updatePaymentMode(orderId, 'manual');
-            paymentModal.style.display = 'none';
-        });
-
-        cardPaymentBtn.addEventListener('click', async function() {
-            const orderId = this.getAttribute('data-order-id');
-            const amount = parseFloat(this.getAttribute('data-amount')) * 100; // Convert to paise
-            try {
-                const res = await fetch('/api/create_razorpay_order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order_id: orderId, amount })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    openRazorpayCheckout(data, orderId);
-                    paymentModal.style.display = 'none';
-                } else {
-                    alert('Failed to create payment order: ' + data.message);
-                }
-            } catch (err) {
-                alert('Error initiating card payment');
-            }
-        });
-
-        async function updatePaymentMode(orderId, mode) {
+            const formData = new FormData();
+            formData.append('order_id', orderId);
+            formData.append('payment_mode', 'manual');
             try {
                 const res = await fetch('/api/update_payment_mode', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order_id: orderId, payment_mode: mode })
+                    body: formData
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert('Payment mode updated');
+                    alert('Manual payment selected. Please pay on delivery.');
+                    paymentModal.style.display = 'none';
                     fetchOrders();
                 } else {
-                    alert('Failed to update payment mode: ' + data.message);
+                    alert('Failed to update payment mode: ' + (data.error || 'Unknown error'));
                 }
             } catch (err) {
-                alert('Error updating payment mode');
+                alert('Error updating payment mode.');
             }
-        }
+        });
 
-        function openRazorpayCheckout(order, orderId) {
-            const options = {
-                key: 'YOUR_RAZORPAY_KEY', // Replace with your Razorpay key
-                amount: order.amount,
-                currency: 'INR',
-                name: 'Smart Flow Dispatch',
-                description: 'Cool Drinks Order Payment',
-                order_id: order.id,
-                handler: function (response) {
-                    verifyPayment(response, orderId);
-                },
-                prefill: {
-                    name: '{{ customer_name }}',
-                    email: '{{ user.email }}',
-                    contact: '{{ user.phone }}'
-                },
-                theme: { color: '#0077cc' }
-            };
-            const rzp = new Razorpay(options);
-            rzp.open();
-        }
+        upiPaymentBtn.addEventListener('click', function() {
+            upiDetails.style.display = 'block';
+        });
 
-        async function verifyPayment(paymentResponse, orderId) {
+        upiProofForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const orderId = upiPaymentBtn.getAttribute('data-order-id');
+            const transactionId = transactionIdInput.value.trim();
+            const file = paymentProofInput.files[0];
+            if (!transactionId || !file) {
+                alert('Please enter transaction ID and upload payment proof.');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('order_id', orderId);
+            formData.append('transaction_id', transactionId);
+            formData.append('payment_proof', file);
             try {
-                const res = await fetch('/api/verify_payment', {
+                const res = await fetch('/api/submit_upi_payment', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        order_id: orderId,
-                        payment_id: paymentResponse.razorpay_payment_id,
-                        signature: paymentResponse.razorpay_signature,
-                        razorpay_order_id: paymentResponse.razorpay_order_id
-                    })
+                    body: formData
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert('Payment successful');
+                    alert('UPI payment submitted for verification.');
+                    paymentModal.style.display = 'none';
                     fetchOrders();
                 } else {
-                    alert('Payment verification failed: ' + data.message);
+                    alert('Failed to submit payment: ' + (data.error || 'Unknown error'));
                 }
             } catch (err) {
-                alert('Error verifying payment');
+                alert('Error submitting payment.');
             }
-        }
+        });
+
+        // Quick Profile Logic
+        document.getElementById('quickProfileBtn').addEventListener('click', function() {
+            document.getElementById('profileQuickView').style.display = 'block';
+            document.getElementById('ordersSection').style.display = 'none';
+            document.getElementById('helpSection').style.display = 'none';
+            fetch(`/customer/profile/${window.USER_ID}`)
+                .then(r => r.text())
+                .then(html => {
+                    document.getElementById('profileQuickContent').innerHTML = html;
+                });
+        });
+        document.getElementById('closeProfileQuick').addEventListener('click', function() {
+            document.getElementById('profileQuickView').style.display = 'none';
+        });
+
+        // Help Section Logic
+        document.getElementById('helpBtn').addEventListener('click', function() {
+            document.getElementById('helpSection').style.display = 'block';
+            document.getElementById('ordersSection').style.display = 'none';
+            document.getElementById('profileQuickView').style.display = 'none';
+        });
+        document.getElementById('closeHelp').addEventListener('click', function() {
+            document.getElementById('helpSection').style.display = 'none';
+        });
     });
+    // End of script
     </script>
     <script src="{{ url_for('static', filename='js/customer.js') }}"></script>
 </body>
