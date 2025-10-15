@@ -5,3 +5,14 @@ ADD COLUMN payment_mode VARCHAR(50) DEFAULT NULL;
 ALTER TABLE orders
 ADD COLUMN transaction_id VARCHAR(100) DEFAULT NULL,
 ADD COLUMN payment_proof VARCHAR(255) DEFAULT NULL;
+
+//you add this TABLE
+CREATE TABLE emergency_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+);

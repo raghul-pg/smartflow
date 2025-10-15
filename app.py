@@ -37,8 +37,8 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='Raghul#2006&',   # change if needed
-        database='soft'            # change if needed
+        password='Lingams@2006',   # change if needed
+        database='cool'            # change if needed
     )
 
 # --- API: Staff assigned orders ---
@@ -199,7 +199,8 @@ def admin_profile(user_id):
     cursor.close()
     conn.close()
     if user:
-        return render_template('profile.html', user=user, user_type='Admin')
+       # return render_template('profile.html', user=user, user_type='Admin')
+       return render_template('profile.html', user=user, user_type='Admin', user_id=user_id)
     return "Admin not found!"
 
 @app.route('/staff/<user_id>')
@@ -250,7 +251,8 @@ def customer_profile1(user_id):
     cursor.close()
     conn.close()
     if user:
-        return render_template('profile.html', user=user, user_type='Customer')
+        #return render_template('profile.html', user=user, user_type='Customer')
+        return render_template('profile.html', user=user, user_type='Customer', user_id=user_id)
     return "Customer not found!"
 
 
@@ -263,7 +265,8 @@ def staff_profile1(user_id):
     cursor.close()
     conn.close()
     if user:
-        return render_template('profile.html', user=user, user_type='Staff')
+        #return render_template('profile.html', user=user, user_type='Staff')
+        return render_template('profile.html', user=user, user_type='Staff', user_id=user_id)
     return "Staff not found!"
 @app.route('/admin/emergency_messages')
 def view_emergency_messages():
@@ -284,6 +287,9 @@ def view_emergency_messages():
 @app.route('/admin/<user_id>', methods=['GET', 'POST'])
 def admin_dashboard(user_id):
     print(f"[DEBUG] admin_dashboard called with user_id={user_id}")
+    wh_msg = None
+    wh_success = False
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -366,20 +372,20 @@ def admin_dashboard(user_id):
     conn2.close()
 
     return render_template(
-        'admin.html',
-        user=user,
-        products=products,
-        warehouses=warehouses,
-        orders=orders,
-        customers=customers,
-        staff=staff,
-        stock=stock,
-        prod_msg=None,
-        prod_success=True,
-        stock_msg=None,
-        stock_success=True,
-        product_demand=product_demand
-    )
+     'admin.html',
+     user=user,
+     products=products,
+     warehouses=warehouses,
+     orders=orders,
+     customers=customers,
+     staff=staff,
+     stock=stock,
+     wh_msg=wh_msg,
+     wh_success=wh_success,
+     product_demand=[]  # ✅ added safe default
+   )
+
+
 
 @app.route('/admin/<user_id>/products', methods=['POST'])
 def admin_products(user_id):
@@ -563,99 +569,63 @@ def admin_warehouses(user_id):
 
 @app.route('/admin/<user_id>/warehouse_stock', methods=['POST'])
 def admin_warehouse_stock(user_id):
-    stock_msg = None
-    stock_success = False
+    wh_msg = None
+    wh_success = False
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Validate admin
-    cursor.execute("SELECT * FROM admin WHERE admin_id = %s", (user_id,))
-    user = cursor.fetchone()
-    if not user:
-        cursor.close()
-        conn.close()
-        return "Admin not found", 404
-
-    # Get form data
     warehouse_id = request.form['warehouse_id']
     product_id = request.form['product_id']
     quantity = int(request.form['quantity'])
 
     try:
         cursor.execute("""
-            SELECT * FROM warehouse_stock 
-            WHERE warehouse_id=%s AND product_id=%s
-        """, (warehouse_id, product_id))
-        existing = cursor.fetchone()
-
-        if existing:
-            cursor.execute("""
-                UPDATE warehouse_stock
-                SET quantity = quantity + %s
-                WHERE warehouse_id = %s AND product_id = %s
-            """, (quantity, warehouse_id, product_id))
-        else:
-            cursor.execute("""
-                INSERT INTO warehouse_stock (warehouse_id, product_id, quantity)
-                VALUES (%s, %s, %s)
-            """, (warehouse_id, product_id, quantity))
-
+            INSERT INTO warehouse_stock (warehouse_id, product_id, quantity)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)
+        """, (warehouse_id, product_id, quantity))
         conn.commit()
-        stock_msg = "✅ Stock updated successfully!"
-        stock_success = True
+
+        wh_msg = "✅ Warehouse stock updated successfully."
+        wh_success = True
 
     except Exception as e:
-        stock_msg = f"❌ Failed to update stock: {str(e)}"
-        stock_success = False
+        conn.rollback()
+        wh_msg = f"❌ Error updating stock: {str(e)}"
+        wh_success = False
 
-    # Always fetch latest orders, customers, staff, products, warehouses, and stock for full dashboard
+    # Fetch updated data
     cursor.execute("SELECT * FROM products")
     products = cursor.fetchall()
+
     cursor.execute("SELECT * FROM warehouses")
     warehouses = cursor.fetchall()
+
     cursor.execute("""
-        SELECT o.id, o.order_code, o.status, o.order_date, o.delivery_date,
-               c.name AS customer_name, c.email, c.city, w.name AS warehouse_name, s.name AS staff_name, o.total_amount
-        FROM orders o
-        JOIN customers c ON o.customer_id = c.customer_id
-        JOIN warehouses w ON o.warehouse_id = w.id
-        LEFT JOIN staff s ON o.staff_id = s.staff_id
-        ORDER BY o.order_date DESC
-    """)
-    orders = cursor.fetchall()
-    for o in orders:
-        cursor.execute("""
-            SELECT oi.product_id, p.name, oi.quantity, p.unit, p.image
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            WHERE oi.order_id = %s
-        """, (o['id'],))
-        o['items'] = cursor.fetchall()
-    cursor.execute("SELECT customer_id, name, email, phone, address, city, state, zip_code FROM customers")
-    customers = cursor.fetchall()
-    cursor.execute("SELECT staff_id, name, email, phone, city FROM staff")
-    staff = cursor.fetchall()
-    cursor.execute("""
-        SELECT w.name AS warehouse_name, p.name AS product_name, ws.quantity
+        SELECT ws.warehouse_id, ws.product_id, ws.quantity,
+               w.name AS warehouse_name, p.name AS product_name
         FROM warehouse_stock ws
         JOIN warehouses w ON ws.warehouse_id = w.id
         JOIN products p ON ws.product_id = p.id
     """)
     stock = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
     return render_template(
         'admin.html',
-        user=user,
-        warehouses=warehouses,
+        user={'admin_id': user_id, 'name': 'Admin'},
         products=products,
+        warehouses=warehouses,
+        orders=[],
+        customers=[],
+        staff=[],
         stock=stock,
-        orders=orders,
-        customers=customers,
-        staff=staff,
-        stock_msg=stock_msg,
-        stock_success=stock_success
+        wh_msg=wh_msg,
+        wh_success=wh_success,
+        product_demand=[]  # ✅ avoids Undefined error
     )
 
     
@@ -1147,6 +1117,76 @@ def update_payment_mode():
         cursor.close()
         conn.close()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/change_password/<user_type>/<user_id>', methods=['POST'])
+def change_password(user_type, user_id):
+    old_password = request.form['old_password']
+    new_password = request.form['new_password']
+    confirm_password = request.form['confirm_password']
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Map table and column names
+    table_map = {
+        'admin': ('admin', 'admin_id'),
+        'staff': ('staff', 'staff_id'),
+        'customer': ('customers', 'customer_id')
+    }
+
+    if user_type not in table_map:
+        cursor.close()
+        conn.close()
+        return render_template('profile.html', msg="Invalid user type", success=False)
+
+    table_name, id_col = table_map[user_type]
+
+    # Fetch current password
+    cursor.execute(f"SELECT password FROM {table_name} WHERE {id_col} = %s", (user_id,))
+    user = cursor.fetchone()
+
+    if not user:
+        cursor.close()
+        conn.close()
+        return render_template('profile.html', msg="User not found", success=False)
+
+    current_password = user['password']
+
+    # Check old password match
+    if current_password != old_password:
+        cursor.close()
+        conn.close()
+        return render_template('profile.html', msg="Old password is incorrect", success=False)
+
+    # Check new passwords match
+    if new_password != confirm_password:
+        cursor.close()
+        conn.close()
+        return render_template('profile.html', msg="New passwords do not match", success=False)
+
+    # Update password
+    cursor.execute(f"UPDATE {table_name} SET password = %s WHERE {id_col} = %s", (new_password, user_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Reload updated profile
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(f"SELECT * FROM {table_name} WHERE {id_col} = %s", (user_id,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'profile.html',
+        user=user,
+        user_type=user_type.title(),
+        user_id=user_id,
+        msg="Password changed successfully!",
+        success=True
+    )
+
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):

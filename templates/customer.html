@@ -39,17 +39,19 @@
     <script src="{{ url_for('static', filename='js/track_delivery.js') }}"></script>
 
     <!-- Navbar -->
+    <!-- Navbar -->
     <nav class="navbar">
         <div class="brand">🚚 <span>Dispatch System</span></div>
         <div class="profile-dropdown">
-            <button id="profileBtn">{{ customer_name }} 👤</button>
-            <div id="dropdownContent" class="dropdown-content">
-                <a href="/customer/profile/{{user.customer_id}}">� View Profile</a>
-                <a href="#" id="themeToggle">🌓 Toggle Theme</a>
-                <a href="/logout">� Logout</a>
+        <button id="profileBtn" class="profile-btn">👤 Profile ▾</button>
+        <div id="dropdownContent" class="dropdown-content">
+            <a href="/customer/profile/{{ user.customer_id }}">👤 View Profile</a>
+            <a href="#" id="themeToggle">🌓 Toggle Theme</a>
+            <a href="/logout">🚪 Logout</a>
             </div>
         </div>
     </nav>
+
 
     <!-- Hero Section -->
     <section class="hero">
@@ -71,12 +73,13 @@
             <p style="color:#888;margin-top:4px;">Your personalized order dashboard</p>
         </header>
         <div class="cards">
-            <a href="/order" class="card small-card">📦 Place New Order</a>
-            <button id="viewOrdersBtn" class="card small-card">📋 View My Orders</button>
-            <button id="quickProfileBtn" class="card small-card">👤 Quick Profile</button>
-            <button id="helpBtn" class="card small-card">❓ Help</button>
-            <button id="refreshBtn" class="card small-card">🔄 Refresh</button>
+        <a href="/customer/order/{{ user.customer_id }}" class="card small-card" id="orderBtn">📦 Place New Order</a>
+        <button id="viewOrdersBtn" class="card small-card">📋 View My Orders</button>
+        <button id="quickProfileBtn" class="card small-card">👤 Quick Profile</button>
+        <button id="helpBtn" class="card small-card">❓ Help</button>
+        <button id="refreshBtn" class="card small-card">🔄 Refresh</button>
         </div>
+
 
         <section id="ordersSection" class="orders-section" style="display:none;">
             <div class="section-header">
