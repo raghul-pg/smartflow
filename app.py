@@ -1,4 +1,7 @@
-# --- API: Submit UPI/manual payment proof ---
+
+
+
+# --- API: Submit UPI/manual payment ---
 from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 import mysql.connector
@@ -10,7 +13,16 @@ import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-
+app.secret_key = 'super_secret_key_2025!@#'  # Set a secure secret key for session management
+@app.route('/place_order/<user_id>')
+def place_order_page(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM products")
+    products = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template('place_order.html', products=products, user_id=user_id)
 # --- API: Staff assigned orders ---
 # ...existing code...
 
@@ -37,8 +49,8 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='Lingams@2006',   # change if needed
-        database='cool'            # change if needed
+        password='Raghul#2006&',   # change if needed
+        database='soft'            # change if needed
     )
 
 # --- API: Staff assigned orders ---
@@ -199,8 +211,7 @@ def admin_profile(user_id):
     cursor.close()
     conn.close()
     if user:
-       # return render_template('profile.html', user=user, user_type='Admin')
-       return render_template('profile.html', user=user, user_type='Admin', user_id=user_id)
+        return render_template('profile.html', user=user, user_type='Admin')
     return "Admin not found!"
 
 @app.route('/staff/<user_id>')
@@ -224,7 +235,8 @@ def api_customer_orders(customer_id):
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         SELECT o.id, o.order_code, o.status, o.order_date, o.delivery_date, o.total_amount,
-               w.name AS warehouse_name, o.distance_km, o.transport_cost, o.transport_time_hours
+               w.name AS warehouse_name, o.distance_km, o.transport_cost, o.transport_time_hours,
+               o.payment_status, o.payment_mode
         FROM orders o
         JOIN warehouses w ON o.warehouse_id = w.id
         WHERE o.customer_id = %s
@@ -251,8 +263,7 @@ def customer_profile1(user_id):
     cursor.close()
     conn.close()
     if user:
-        #return render_template('profile.html', user=user, user_type='Customer')
-        return render_template('profile.html', user=user, user_type='Customer', user_id=user_id)
+        return render_template('profile.html', user=user, user_type='Customer')
     return "Customer not found!"
 
 
@@ -265,8 +276,7 @@ def staff_profile1(user_id):
     cursor.close()
     conn.close()
     if user:
-        #return render_template('profile.html', user=user, user_type='Staff')
-        return render_template('profile.html', user=user, user_type='Staff', user_id=user_id)
+        return render_template('profile.html', user=user, user_type='Staff')
     return "Staff not found!"
 @app.route('/admin/emergency_messages')
 def view_emergency_messages():
@@ -287,9 +297,6 @@ def view_emergency_messages():
 @app.route('/admin/<user_id>', methods=['GET', 'POST'])
 def admin_dashboard(user_id):
     print(f"[DEBUG] admin_dashboard called with user_id={user_id}")
-    wh_msg = None
-    wh_success = False
-
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -372,20 +379,20 @@ def admin_dashboard(user_id):
     conn2.close()
 
     return render_template(
-     'admin.html',
-     user=user,
-     products=products,
-     warehouses=warehouses,
-     orders=orders,
-     customers=customers,
-     staff=staff,
-     stock=stock,
-     wh_msg=wh_msg,
-     wh_success=wh_success,
-     product_demand=[]  # ✅ added safe default
-   )
-
-
+        'admin.html',
+        user=user,
+        products=products,
+        warehouses=warehouses,
+        orders=orders,
+        customers=customers,
+        staff=staff,
+        stock=stock,
+        prod_msg=None,
+        prod_success=True,
+        stock_msg=None,
+        stock_success=True,
+        product_demand=product_demand
+    )
 
 @app.route('/admin/<user_id>/products', methods=['POST'])
 def admin_products(user_id):
@@ -538,12 +545,13 @@ def admin_warehouses(user_id):
 
     # You might also want orders, customers, staff fetched here like in admin_dashboard
     cursor.execute("""SELECT o.id, o.order_code, o.status, o.order_date, o.delivery_date,
-                             c.name AS customer_name, w.name AS warehouse_name, s.name AS staff_name, o.total_amount
-                      FROM orders o
-                      JOIN customers c ON o.customer_id = c.customer_id
-                      JOIN warehouses w ON o.warehouse_id = w.id
-                      LEFT JOIN staff s ON o.staff_id = s.staff_id
-                      ORDER BY o.order_date DESC""")
+                 c.name AS customer_name, w.name AS warehouse_name, s.name AS staff_name, o.total_amount,
+                 o.payment_status, o.payment_mode
+             FROM orders o
+             JOIN customers c ON o.customer_id = c.customer_id
+             JOIN warehouses w ON o.warehouse_id = w.id
+             LEFT JOIN staff s ON o.staff_id = s.staff_id
+             ORDER BY o.order_date DESC""")
     orders = cursor.fetchall()
 
     cursor.execute("SELECT customer_id, name, email, phone, address, city, state, zip_code FROM customers")
@@ -569,63 +577,122 @@ def admin_warehouses(user_id):
 
 @app.route('/admin/<user_id>/warehouse_stock', methods=['POST'])
 def admin_warehouse_stock(user_id):
-    wh_msg = None
-    wh_success = False
-
+    stock_msg = None
+    stock_success = False
+    product_demand = []  # Default to empty list
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
+    # Validate admin
+    cursor.execute("SELECT * FROM admin WHERE admin_id = %s", (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        cursor.close()
+        conn.close()
+        return render_template(
+            'admin.html',
+            user=None,
+            warehouses=[],
+            products=[],
+            stock=[],
+            orders=[],
+            customers=[],
+            staff=[],
+            stock_msg="Admin not found",
+            stock_success=False,
+            product_demand=[]
+        ), 404
+
+    # Get form data
     warehouse_id = request.form['warehouse_id']
     product_id = request.form['product_id']
     quantity = int(request.form['quantity'])
 
     try:
         cursor.execute("""
-            INSERT INTO warehouse_stock (warehouse_id, product_id, quantity)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)
-        """, (warehouse_id, product_id, quantity))
-        conn.commit()
+            SELECT * FROM warehouse_stock 
+            WHERE warehouse_id=%s AND product_id=%s
+        """, (warehouse_id, product_id))
+        existing = cursor.fetchone()
 
-        wh_msg = "✅ Warehouse stock updated successfully."
-        wh_success = True
+        if existing:
+            cursor.execute("""
+                UPDATE warehouse_stock
+                SET quantity = quantity + %s
+                WHERE warehouse_id = %s AND product_id = %s
+            """, (quantity, warehouse_id, product_id))
+        else:
+            cursor.execute("""
+                INSERT INTO warehouse_stock (warehouse_id, product_id, quantity)
+                VALUES (%s, %s, %s)
+            """, (warehouse_id, product_id, quantity))
+
+        conn.commit()
+        stock_msg = "✅ Stock updated successfully!"
+        stock_success = True
 
     except Exception as e:
-        conn.rollback()
-        wh_msg = f"❌ Error updating stock: {str(e)}"
-        wh_success = False
+        stock_msg = f"❌ Failed to update stock: {str(e)}"
+        stock_success = False
 
-    # Fetch updated data
+    # Always fetch latest orders, customers, staff, products, warehouses, and stock for full dashboard
     cursor.execute("SELECT * FROM products")
     products = cursor.fetchall()
-
     cursor.execute("SELECT * FROM warehouses")
     warehouses = cursor.fetchall()
-
     cursor.execute("""
-        SELECT ws.warehouse_id, ws.product_id, ws.quantity,
-               w.name AS warehouse_name, p.name AS product_name
+        SELECT o.id, o.order_code, o.status, o.order_date, o.delivery_date,
+               c.name AS customer_name, c.email, c.city, w.name AS warehouse_name, s.name AS staff_name, o.total_amount
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.customer_id
+        JOIN warehouses w ON o.warehouse_id = w.id
+        LEFT JOIN staff s ON o.staff_id = s.staff_id
+        ORDER BY o.order_date DESC
+    """)
+    orders = cursor.fetchall()
+    for o in orders:
+        cursor.execute("""
+            SELECT oi.product_id, p.name, oi.quantity, p.unit, p.image
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            WHERE oi.order_id = %s
+        """, (o['id'],))
+        o['items'] = cursor.fetchall()
+    cursor.execute("SELECT customer_id, name, email, phone, address, city, state, zip_code FROM customers")
+    customers = cursor.fetchall()
+    cursor.execute("SELECT staff_id, name, email, phone, city FROM staff")
+    staff = cursor.fetchall()
+    cursor.execute("""
+        SELECT w.name AS warehouse_name, p.name AS product_name, ws.quantity
         FROM warehouse_stock ws
         JOIN warehouses w ON ws.warehouse_id = w.id
         JOIN products p ON ws.product_id = p.id
     """)
     stock = cursor.fetchall()
-
+    # Fetch product demand data
+    cursor.execute("""
+        SELECT p.id AS product_id, p.name, COALESCE(SUM(oi.quantity), 0) AS total_ordered
+        FROM products p
+        LEFT JOIN order_items oi ON oi.product_id = p.id
+        GROUP BY p.id, p.name
+        ORDER BY total_ordered DESC
+    """)
+    product_demand = cursor.fetchall() or []
     cursor.close()
     conn.close()
 
     return render_template(
         'admin.html',
-        user={'admin_id': user_id, 'name': 'Admin'},
-        products=products,
+        user=user,
         warehouses=warehouses,
-        orders=[],
-        customers=[],
-        staff=[],
+        products=products,
         stock=stock,
-        wh_msg=wh_msg,
-        wh_success=wh_success,
-        product_demand=[]  # ✅ avoids Undefined error
+        orders=orders,
+        customers=customers,
+        staff=staff,
+        stock_msg=stock_msg,
+        stock_success=stock_success,
+        product_demand=product_demand
     )
 
     
@@ -831,7 +898,7 @@ def api_products():
 
 # --- Page: place order (customer-facing) ---
 @app.route('/place-order')
-def place_order_page():
+def place_order_generic():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT id, name, category, price, unit, status, manufacturing_date, expiry_date, image FROM products")
@@ -935,9 +1002,13 @@ def api_checkout():
             # Deduct all from mapped region warehouse
             cursor.execute("UPDATE warehouse_stock SET quantity = quantity - %s, updated_on = NOW() WHERE warehouse_id = %s AND product_id = %s", (qty, warehouse_id, pid))
         else:
+            # Insert emergency message for admin
+            alert_msg = f"Product ID {pid} is out of stock in warehouse {warehouse_city}. Customer {customer_id} attempted to order {qty} units."
+            cursor.execute("INSERT INTO emergency_messages (product_id, warehouse_id, message) VALUES (%s, %s, %s)", (pid, warehouse_id, alert_msg))
+            conn.commit()
             cursor.close()
             conn.close()
-            return jsonify({"success": False, "error": f"Product ID {pid} is out of stock in your region warehouse."}), 400
+            return jsonify({"success": False, "error": f"Product ID {pid} is out of stock. Admin has been notified to restock soon."}), 400
 
     # create order
     # Calculate transport info
@@ -1105,10 +1176,14 @@ def update_payment_mode():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # If payment_mode is 'manual' or 'upi', set status to 'Paid'
+        status = 'Paid' if payment_mode in ['manual', 'upi'] else 'Pending'
+        print(f"[DEBUG] Updating payment: order_id={order_id}, user_id={session['user_id']}, payment_mode={payment_mode}, status={status}")
         cursor.execute("""
-            UPDATE orders SET payment_status='Pending', payment_mode=%s WHERE id=%s AND customer_id=%s
-        """, (payment_mode, order_id, session['user_id']))
+            UPDATE orders SET payment_status=%s, payment_mode=%s WHERE id=%s AND customer_id=%s
+        """, (status, payment_mode, order_id, session['user_id']))
         conn.commit()
+        print(f"[DEBUG] Rows affected: {cursor.rowcount}")
         cursor.close()
         conn.close()
         return jsonify({'success': True})

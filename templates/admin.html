@@ -318,7 +318,7 @@ setInterval(loadEmergencyMessages, 15000); // auto-refresh every 15 sec
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        var productDemand = {{ product_demand|tojson|safe }};
+    var productDemand = {{ (product_demand or [])|tojson|safe }};
         const labels = productDemand.map(d => d.name);
         const values = productDemand.map(d => d.total_ordered);
         const topIdx = values.length ? values.indexOf(Math.max(...values)) : -1;
