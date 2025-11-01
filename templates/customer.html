@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <title>Customer Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/customer.css') }}">
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <script>
+        // on page load ensure session still active; if not, redirect to home
+        document.addEventListener('DOMContentLoaded', function(){
+            fetch('/api/check_session', { credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.logged_in) window.location.href = '/';
+                })
+                .catch(()=>{ /* ignore network errors */ });
+        });
+    </script>
 </head>
 <body>
     <!-- Modal for Order Tracking -->
@@ -51,6 +63,37 @@
             </div>
         </div>
     </nav>
+
+        <script>
+            // Profile dropdown toggle for customer page
+            document.addEventListener('DOMContentLoaded', function(){
+                const profileBtn = document.getElementById('profileBtn');
+                const dropdown = document.getElementById('dropdownContent');
+                if (profileBtn) {
+                    profileBtn.addEventListener('click', function(e){
+                        e.stopPropagation();
+                        dropdown.classList.toggle('show');
+                    });
+                    document.body.addEventListener('click', function(){ dropdown.classList.remove('show'); });
+                }
+            });
+
+                // session check helper to handle bfcache/back-button: redirect to home if session invalid
+                function checkSessionAndRedirectCustomer() {
+                    try {
+                        fetch('/api/check_session', { credentials: 'same-origin' })
+                            .then(r => r.json())
+                            .then(d => { if (!d.logged_in) window.location.href = '/'; })
+                            .catch(()=>{});
+                    } catch (e) {}
+                }
+
+                // run on initial load and when page is shown from bfcache or via back navigation
+                document.addEventListener('DOMContentLoaded', checkSessionAndRedirectCustomer);
+                window.addEventListener('pageshow', function(e) { if (e.persisted) checkSessionAndRedirectCustomer(); });
+                window.addEventListener('popstate', checkSessionAndRedirectCustomer);
+
+        </script>
 
 
     <!-- Hero Section -->

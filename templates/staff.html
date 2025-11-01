@@ -5,6 +5,18 @@
     <title>Staff Dashboard | Dispatch</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/staff.css') }}">
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <script>
+        // Ensure staff session still active; if not redirect to home
+        document.addEventListener('DOMContentLoaded', function(){
+            fetch('/api/check_session', { credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.logged_in) window.location.href = '/';
+                })
+                .catch(()=>{});
+        });
+    </script>
 </head>
 <body>
     <!-- Navbar -->
@@ -90,16 +102,19 @@
     <script>
     window.STAFF_ID = "{{ user.staff_id }}";
     document.addEventListener('DOMContentLoaded', function() {
-        // Profile dropdown toggle
+        // Profile dropdown toggle (robust: uses inline display so CSS 'show' class isn't required)
         const profileBtn = document.getElementById('profileBtn');
         const dropdown = document.getElementById('dropdownContent');
-        profileBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            dropdown.classList.toggle('show');
-        });
-        document.body.addEventListener('click', function() {
-            dropdown.classList.remove('show');
-        });
+        if (profileBtn && dropdown) {
+            profileBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dropdown.style.display = (dropdown.style.display === 'block') ? 'none' : 'block';
+            });
+            // hide when clicking outside
+            document.body.addEventListener('click', function() {
+                dropdown.style.display = 'none';
+            });
+        }
 
         // Theme toggle
         document.getElementById('themeToggle').addEventListener('click', function(e) {

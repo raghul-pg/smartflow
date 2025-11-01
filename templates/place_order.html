@@ -11,6 +11,9 @@
 <body>
   <header class="topbar">
     <div class="brand">🚚 Smart Dispatch</div>
+    <div style="margin-left:10px;">
+      <button id="backToCustomerBtn" class="btn" style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;margin-right:8px;">← Back</button>
+    </div>
     <div class="actions">
       <button id="openCartBtn" class="cart-btn">🛒 <span id="cartCount">0</span></button>
     </div>
@@ -76,5 +79,34 @@
 
   <!-- lightweight toast -->
   <div id="toast" class="toast" style="display:none"></div>
+  <script>
+    // session check helper: ensures user is still logged in when the page is shown (covers bfcache/back navigation)
+    function checkSessionAndRedirect() {
+      try {
+        fetch('/api/check_session', { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(d => { if (!d.logged_in) window.location.href = '/'; })
+          .catch(() => {});
+      } catch (e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      const backBtn = document.getElementById('backToCustomerBtn');
+      if (backBtn) backBtn.addEventListener('click', function(){
+        const uid = window.USER_ID || '';
+        if (uid) location.href = `/customer/${uid}`;
+        else location.href = '/';
+      });
+      // run a session check on initial load
+      checkSessionAndRedirect();
+    });
+
+    // If the page is restored from bfcache (pageshow.persisted === true), re-check session
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted) checkSessionAndRedirect();
+    });
+    // For other history navigations
+    window.addEventListener('popstate', checkSessionAndRedirect);
+  </script>
 </body>
 </html>

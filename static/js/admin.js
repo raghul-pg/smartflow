@@ -3,23 +3,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const btn = document.getElementById("profileBtn");
     const dropdown = document.getElementById("dropdownContent");
     if (btn && dropdown) {
-        btn.onclick = function () {
-            dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
-        };
-        window.onclick = function(event) {
-            if (!event.target.matches('#profileBtn')) {
-                dropdown.style.display = "none";
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isOpen = dropdown.style.display === 'block' || dropdown.classList.contains('show');
+            if (isOpen) {
+                dropdown.style.display = 'none';
+                dropdown.classList.remove('show');
+            } else {
+                dropdown.style.display = 'block';
+                dropdown.classList.add('show');
             }
-        };
+        });
+        // hide when clicking outside both button and dropdown
+        document.addEventListener('click', function (event) {
+            if (!btn.contains(event.target) && !dropdown.contains(event.target)) {
+                dropdown.style.display = 'none';
+                dropdown.classList.remove('show');
+            }
+        });
     }
 });
 
-// static/js/admin.js
-document.addEventListener('DOMContentLoaded', function () {
-    // Profile dropdown toggle
-    document.getElementById('profileBtn')?.addEventListener('click', function () {
-        document.getElementById('dropdownContent').classList.toggle('show');
-    });
+    // static/js/admin.js
+    document.addEventListener('DOMContentLoaded', function () {
+    // NOTE: dropdown toggle handled above; keep rest of initialization here
 
     /* ============ EDIT / DELETE HANDLERS ============ */
     function openEditModal(type, id, data) {

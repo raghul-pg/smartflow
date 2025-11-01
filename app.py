@@ -1072,8 +1072,27 @@ def calculate_transport(warehouse, customer_city):
 
 @app.route('/logout')
 def logout():
+    # Clear session and redirect to login page
     session.clear()
-    return render_template('home.html')
+    return redirect(url_for('login'))
+
+
+# Prevent caching of sensitive pages so browser back/forward reloads from server
+@app.after_request
+def add_security_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, public, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@app.route('/api/check_session')
+def api_check_session():
+    # simple endpoint used by front-end to verify whether the user session is still active
+    user_id = session.get('user_id')
+    if user_id:
+        return jsonify({'logged_in': True, 'user_id': user_id})
+    return jsonify({'logged_in': False}), 200
 
 # --- API: Update order status ---
 @app.route('/api/update_order_status/<int:order_id>', methods=['POST'])
