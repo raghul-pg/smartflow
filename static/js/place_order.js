@@ -74,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .catch(err => {
         showToast('Network error');
-        console.error(err);
       });
     });
   

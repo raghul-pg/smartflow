@@ -296,18 +296,15 @@ def view_emergency_messages():
     
 @app.route('/admin/<user_id>', methods=['GET', 'POST'])
 def admin_dashboard(user_id):
-    print(f"[DEBUG] admin_dashboard called with user_id={user_id}")
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
     # Get admin
     cursor.execute("SELECT * FROM admin WHERE admin_id = %s", (user_id,))
     user = cursor.fetchone()
-    print(f"[DEBUG] admin query result: {user}")
     if not user:
         cursor.close()
         conn.close()
-        print(f"[ERROR] Admin not found for user_id={user_id}")
         return "Admin not found!", 404
 
     # Get products
@@ -864,12 +861,10 @@ def staff_near(city):
 @app.route("/admin/assign_staff/<order_id>", methods=["POST"])
 def assign_staff(order_id):
     staff_id = request.json.get("staff_id")
-    print(f"[DEBUG] assign_staff called with order_id={order_id}, staff_id={staff_id}")
     db = get_db_connection()
     cur = db.cursor()
     # Set status to 'Order Confirmed' when staff is assigned
     result = cur.execute("UPDATE orders SET staff_id = %s, status = 'Order Confirmed' WHERE id = %s", (staff_id, order_id))
-    print(f"[DEBUG] SQL executed, result={result}")
     db.commit()
     db.close()
     return jsonify({"message": "Staff assigned successfully"})
@@ -1057,10 +1052,6 @@ DISTANCES = {
 def calculate_transport(warehouse, customer_city):
     warehouse = warehouse.lower()
     customer_city = customer_city.lower()
-    print(warehouse," ",customer_city)
-    print("\n")
-    print(DISTANCES[warehouse])
-    print(DISTANCES[warehouse][customer_city])
     if warehouse in DISTANCES and customer_city in DISTANCES[warehouse]:
         km = DISTANCES[warehouse][customer_city]
         cost = km * 5
@@ -1197,12 +1188,10 @@ def update_payment_mode():
     try:
         # If payment_mode is 'manual' or 'upi', set status to 'Paid'
         status = 'Paid' if payment_mode in ['manual', 'upi'] else 'Pending'
-        print(f"[DEBUG] Updating payment: order_id={order_id}, user_id={session['user_id']}, payment_mode={payment_mode}, status={status}")
         cursor.execute("""
             UPDATE orders SET payment_status=%s, payment_mode=%s WHERE id=%s AND customer_id=%s
         """, (status, payment_mode, order_id, session['user_id']))
         conn.commit()
-        print(f"[DEBUG] Rows affected: {cursor.rowcount}")
         cursor.close()
         conn.close()
         return jsonify({'success': True})
